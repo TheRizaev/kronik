@@ -1,0 +1,548 @@
+{% extends 'main/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ video.title }} - KRONIK{% endblock %}
+
+{% block extra_head %}
+<!-- Подключаем CSS для плеера -->
+{% endblock %}
+
+{% block content %}
+<div class="video-page-layout">
+    <div class="video-content">
+        <div class="video-container">
+            <div class="video-wrapper">
+                <video id="video-player" poster="{% if video.thumbnail %}{{ video.thumbnail.url }}{% else %}{% static 'placeholder.jpg' %}{% endif %}">
+                    <source src="{{ video.video_file.url|default:'#' }}" type="video/mp4">
+                    Ваш браузер не поддерживает видео HTML5.
+                </video>
+                
+                <div class="video-overlays">
+                    <div class="top-controls">
+                        <div class="video-title">{{ video.title }}</div>
+                        <div class="kronik-logo">
+                            <div class="logo-icon">K</div>
+                            <span>KRONIK</span>
+                        </div>
+                    </div>
+                    
+                    <div class="overlay-bottom-controls">
+                        <div class="progress-container" id="progress-container">
+                            <div class="buffer-bar" id="buffer-bar"></div>
+                            <div class="progress-bar" id="progress-bar">
+                                <div class="progress-handle"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="controls-row">
+                            <div class="left-controls">
+                                <button class="control-button" id="play-pause-btn">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M8 5V19L19 12L8 5Z" fill="currentColor"/>
+                                    </svg>
+                                </button>
+                                
+                                <div class="volume-container">
+                                    <button class="control-button" id="volume-btn">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M11 5L6 9H2V15H6L11 19V5Z" fill="currentColor"/>
+                                            <path d="M19.07 4.93C20.91 6.77 22 9.27 22 12C22 14.73 20.91 17.23 19.07 19.07" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                            <path d="M15.54 8.46C16.47 9.39 17 10.62 17 12C17 13.38 16.47 14.61 15.54 15.54" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                    </button>
+                                    
+                                    <div class="volume-slider">
+                                        <div class="volume-bar" id="volume-bar">
+                                            <div class="volume-level" id="volume-level"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="time-display">
+                                    <span id="current-time">0:00</span>
+                                    <span>/</span>
+                                    <span id="duration">0:00</span>
+                                </div>
+                            </div>
+                            
+                            <div class="right-controls">
+                                <button class="control-button" id="pip-btn">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                                        <rect x="14" y="11" width="6" height="5" rx="1" fill="currentColor"/>
+                                    </svg>
+                                </button>
+                                
+                                <button class="control-button" id="fullscreen-btn">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M4 8V4H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M4 16V20H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M20 8V4H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M20 16V20H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                                
+                                <button class="control-button" id="settings-btn">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 8C9.79 8 8 9.79 8 12C8 14.21 9.79 16 12 16C14.21 16 16 14.21 16 12C16 9.79 14.21 8 12 8ZM12 14C10.9 14 10 13.1 10 12C10 10.9 10.9 10 12 10C13.1 10 14 10.9 14 12C14 13.1 13.1 14 12 14Z" fill="currentColor"/>
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M13.88 3.5L14.38 6.06C14.95 6.29 15.48 6.61 15.95 7L18.41 6.11L20.29 9.39L18.11 10.95C18.11 11.3 18.11 11.65 18.11 12C18.11 12.35 18.11 12.7 18.11 13.05L20.29 14.61L18.41 17.89L15.95 17C15.48 17.39 14.95 17.71 14.38 17.94L13.88 20.5H10.12L9.62 17.94C9.05 17.71 8.52 17.39 8.05 17L5.59 17.89L3.71 14.61L5.89 13.05C5.89 12.7 5.89 12.35 5.89 12C5.89 11.65 5.89 11.3 5.89 10.95L3.71 9.39L5.59 6.11L8.05 7C8.52 6.61 9.05 6.29 9.62 6.06L10.12 3.5H13.88ZM12 8C14.21 8 16 9.79 16 12C16 14.21 14.21 16 12 16C9.79 16 8 14.21 8 12C8 9.79 9.79 8 12 8Z" stroke="currentColor" stroke-width="2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="play-big-button visible" id="play-big-btn">
+                    <div class="play-icon"></div>
+                </div>
+                
+                <div class="loading-spinner" id="loading-spinner">
+                    {% comment %} <div class="spinner"></div> {% endcomment %}
+                </div>
+            </div>
+            
+            <div class="settings-menu" id="settings-menu">
+                <div class="settings-item" id="playback-speed-item">
+                    <span>Скорость воспроизведения</span>
+                    <span id="current-speed">1x</span>
+                </div>
+                
+                <div class="playback-speed-options" id="playback-speed-options">
+                    <div class="speed-option" data-speed="0.25">0.25x</div>
+                    <div class="speed-option" data-speed="0.5">0.5x</div>
+                    <div class="speed-option" data-speed="0.75">0.75x</div>
+                    <div class="speed-option active" data-speed="1">1x</div>
+                    <div class="speed-option" data-speed="1.25">1.25x</div>
+                    <div class="speed-option" data-speed="1.5">1.5x</div>
+                    <div class="speed-option" data-speed="1.75">1.75x</div>
+                    <div class="speed-option" data-speed="2">2x</div>
+                </div>
+                
+                <div class="settings-item" id="quality-item">
+                    <span>Качество</span>
+                    <span id="current-quality">Авто</span>
+                </div>
+                
+                <div class="quality-options" id="quality-options">
+                    <div class="quality-option active" data-quality="auto">Авто</div>
+                    <div class="quality-option" data-quality="1080p">1080p</div>
+                    <div class="quality-option" data-quality="720p">720p</div>
+                    <div class="quality-option" data-quality="480p">480p</div>
+                    <div class="quality-option" data-quality="360p">360p</div>
+                </div>
+                
+                <div class="settings-item" id="loop-item">
+                    <span>Повтор</span>
+                    <span id="loop-status">Выкл</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="video-details">
+            <h1>{{ video.title }}</h1>
+            <div class="video-info-bar">
+                <div class="views-info">{{ video.views }} • {{ video.age }}</div>
+                <div class="actions-bar">
+                    <button class="action-button" id="likeButton">👍 <span id="likeCount">0</span></button>
+                    <button class="action-button" id="dislikeButton">👎 <span id="dislikeCount">0</span></button>
+                    <button class="action-button">↗️ Поделиться</button>
+                    <button class="action-button">💾 Сохранить</button>
+                </div>
+            </div>
+            
+            <div class="channel-info">
+                <div class="channel-avatar">{{ video.channel|first }}</div>
+                <div class="channel-details">
+                    <div class="channel-name">{{ video.channel }}</div>
+                    <div class="subscribers">10K подписчиков</div>
+                </div>
+                <button class="subscribe-button">Подписаться</button>
+            </div>
+            
+            <div class="video-description">
+                <p>{{ video.description|default:"Описание видео отсутствует." }}</p>
+            </div>
+        </div>
+                
+        <div class="comments-section">
+            <h2>Комментарии</h2>
+            <div class="comment-form">
+                <div class="user-avatar">{% if user.is_authenticated %}{{ user.username|first }}{% else %}Г{% endif %}</div>
+                <input type="text" placeholder="{% if user.is_authenticated %}Добавить комментарий...{% else %}Войдите, чтобы комментировать{% endif %}" {% if not user.is_authenticated %}disabled{% endif %}>
+            </div>
+            
+            <div class="comments-list">
+                {% if comments %}
+                    {% for comment in comments %}
+                    <div class="comment">
+                        <div class="comment-avatar">{{ comment.user.username|first }}</div>
+                        <div class="comment-content">
+                            <div class="comment-author">{{ comment.user.username }}</div>
+                            <div class="comment-text">{{ comment.content }}</div>
+                            <div class="comment-meta">{{ comment.created_at|naturaltime }}</div>
+                            <div class="comment-actions">
+                                <button class="comment-like">👍 <span>{{ comment.likes|default:"0" }}</span></button>
+                                <button class="comment-dislike">👎</button>
+                                <button class="comment-reply">Ответить</button>
+                            </div>
+                            
+                            {% if comment.replies.exists %}
+                            <div class="comment-replies">
+                                {% for reply in comment.replies.all %}
+                                <div class="reply">
+                                    <div class="comment-avatar">{{ reply.user.username|first }}</div>
+                                    <div class="comment-content">
+                                        <div class="comment-author">{{ reply.user.username }}</div>
+                                        <div class="comment-text">{{ reply.content }}</div>
+                                        <div class="comment-meta">{{ reply.created_at|naturaltime }}</div>
+                                        <div class="comment-actions">
+                                            <button class="comment-like">👍 <span>{{ reply.likes|default:"0" }}</span></button>
+                                            <button class="comment-dislike">👎</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="comment">
+                        <div class="comment-avatar">К</div>
+                        <div class="comment-content">
+                            <div class="comment-author">Комментатор</div>
+                            <div class="comment-text">Очень полезное видео! Спасибо за объяснение.</div>
+                            <div class="comment-meta">2 дня назад</div>
+                            <div class="comment-actions">
+                                <button class="comment-like">👍 <span>24</span></button>
+                                <button class="comment-dislike">👎</button>
+                                <button class="comment-reply">Ответить</button>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="related-videos">
+        <h3>Рекомендуемые видео</h3>
+        <div class="related-videos-list" id="related-videos-container">
+            <!-- Рекомендуемые видео будут добавлены с помощью JavaScript -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>document.addEventListener('DOMContentLoaded', function() {
+    const videoPlayer = document.getElementById('video-player');
+    const playPauseBtn = document.getElementById('play-pause-btn');
+    const playBigBtn = document.getElementById('play-big-btn');
+    const volumeBtn = document.getElementById('volume-btn');
+    const volumeBar = document.getElementById('volume-bar');
+    const volumeLevel = document.getElementById('volume-level');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const bufferBar = document.getElementById('buffer-bar');
+    const currentTimeDisplay = document.getElementById('current-time');
+    const durationDisplay = document.getElementById('duration');
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    const pipBtn = document.getElementById('pip-btn');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsMenu = document.getElementById('settings-menu');
+    const playbackSpeedItem = document.getElementById('playback-speed-item');
+    const playbackSpeedOptions = document.getElementById('playback-speed-options');
+    const qualityItem = document.getElementById('quality-item');
+    const qualityOptions = document.getElementById('quality-options');
+    const loopItem = document.getElementById('loop-item');
+    const loopStatus = document.getElementById('loop-status');
+    const currentSpeed = document.getElementById('current-speed');
+    const currentQuality = document.getElementById('current-quality');
+    const speedOptions = document.querySelectorAll('.speed-option');
+    const qualityOptionsElements = document.querySelectorAll('.quality-option');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const videoContainer = document.querySelector('.video-container');
+    const videoTitle = document.querySelector('.video-title');
+    
+    // Симуляция загрузки видео
+    loadingSpinner.classList.add('visible');
+    setTimeout(() => {
+        loadingSpinner.classList.remove('visible');
+    }, 2000);
+    
+    // Обработчики событий для видео
+    videoPlayer.addEventListener('loadedmetadata', function() {
+        durationDisplay.textContent = formatTime(videoPlayer.duration);
+    });
+    
+    videoPlayer.addEventListener('timeupdate', function() {
+        currentTimeDisplay.textContent = formatTime(videoPlayer.currentTime);
+        const progress = (videoPlayer.currentTime / videoPlayer.duration) * 100;
+        progressBar.style.width = `${progress}%`;
+    });
+    
+    videoPlayer.addEventListener('progress', function() {
+        if (videoPlayer.buffered.length > 0) {
+            const bufferedEnd = videoPlayer.buffered.end(videoPlayer.buffered.length - 1);
+            const duration = videoPlayer.duration;
+            const bufferedPercent = (bufferedEnd / duration) * 100;
+            bufferBar.style.width = `${bufferedPercent}%`;
+        }
+    });
+    
+    videoPlayer.addEventListener('waiting', function() {
+        loadingSpinner.classList.add('visible');
+    });
+    
+    videoPlayer.addEventListener('playing', function() {
+        loadingSpinner.classList.remove('visible');
+        updatePlayPauseIcon(true);
+    });
+    
+    videoPlayer.addEventListener('pause', function() {
+        updatePlayPauseIcon(false);
+        playBigBtn.classList.add('visible');
+    });
+    
+    videoPlayer.addEventListener('ended', function() {
+        updatePlayPauseIcon(false);
+        playBigBtn.classList.add('visible');
+    });
+    
+    // Функция для форматирования времени
+    function formatTime(seconds) {
+        if (isNaN(seconds)) return "0:00";
+        
+        const minutes = Math.floor(seconds / 60);
+        seconds = Math.floor(seconds % 60);
+        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+    
+    // Функция для обновления иконки воспроизведения/паузы
+    function updatePlayPauseIcon(isPlaying) {
+        if (isPlaying) {
+            playPauseBtn.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/>
+                    <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/>
+                </svg>
+            `;
+            playBigBtn.innerHTML = `
+                <div class="pause-icon">
+                    <div class="pause-bar"></div>
+                    <div class="pause-bar"></div>
+                </div>
+            `;
+            playBigBtn.classList.remove('visible');
+        } else {
+            playPauseBtn.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 5V19L19 12L8 5Z" fill="currentColor"/>
+                </svg>
+            `;
+            playBigBtn.innerHTML = `<div class="play-icon"></div>`;
+        }
+    }
+    
+    // Функция воспроизведения/паузы
+    function togglePlay() {
+        if (videoPlayer.paused) {
+            videoPlayer.play();
+        } else {
+            videoPlayer.pause();
+        }
+    }
+    
+    // Обработчики кнопок воспроизведения/паузы
+    playPauseBtn.addEventListener('click', togglePlay);
+    playBigBtn.addEventListener('click', togglePlay);
+    videoPlayer.addEventListener('click', togglePlay);
+    
+    // Обработка прогресс-бара
+    progressContainer.addEventListener('click', function(e) {
+        const rect = progressContainer.getBoundingClientRect();
+        const position = (e.clientX - rect.left) / rect.width;
+        videoPlayer.currentTime = position * videoPlayer.duration;
+    });
+    
+    // Обработка регулятора громкости
+    volumeBar.addEventListener('click', function(e) {
+        const rect = volumeBar.getBoundingClientRect();
+        const position = (e.clientX - rect.left) / rect.width;
+        videoPlayer.volume = position;
+        volumeLevel.style.width = `${position * 100}%`;
+        updateVolumeIcon();
+    });
+    
+    // Обновление иконки громкости
+    function updateVolumeIcon() {
+        if (videoPlayer.muted || videoPlayer.volume === 0) {
+            volumeBtn.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 5L6 9H2V15H6L11 19V5Z" fill="currentColor"/>
+                    <path d="M23 9L17 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M17 9L23 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            `;
+        } else if (videoPlayer.volume < 0.5) {
+            volumeBtn.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 5L6 9H2V15H6L11 19V5Z" fill="currentColor"/>
+                    <path d="M15.54 8.46C16.47 9.39 17 10.62 17 12C17 13.38 16.47 14.61 15.54 15.54" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            `;
+        } else {
+            volumeBtn.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 5L6 9H2V15H6L11 19V5Z" fill="currentColor"/>
+                    <path d="M15.54 8.46C16.47 9.39 17 10.62 17 12C17 13.38 16.47 14.61 15.54 15.54" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M19.07 4.93C20.91 6.77 22 9.27 22 12C22 14.73 20.91 17.23 19.07 19.07" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            `;
+        }
+    }
+    
+    // Обработчик кнопки громкости (вкл/выкл звук)
+    volumeBtn.addEventListener('click', function() {
+        videoPlayer.muted = !videoPlayer.muted;
+        if (videoPlayer.muted) {
+            volumeLevel.style.width = '0%';
+        } else {
+            volumeLevel.style.width = `${videoPlayer.volume * 100}%`;
+        }
+        updateVolumeIcon();
+    });
+    
+    // Обработчик полноэкранного режима
+    fullscreenBtn.addEventListener('click', function() {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            videoContainer.requestFullscreen();
+        }
+    });
+    
+    // Обработчик режима "Картинка в картинке"
+    pipBtn.addEventListener('click', function() {
+        if (document.pictureInPictureElement) {
+            document.exitPictureInPicture();
+        } else if (document.pictureInPictureEnabled) {
+            videoPlayer.requestPictureInPicture();
+        }
+    });
+    
+    // Обработчик меню настроек
+    settingsBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        settingsMenu.classList.toggle('active');
+    });
+    
+    // Закрытие меню настроек при клике вне его
+    document.addEventListener('click', function(e) {
+        if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+            settingsMenu.classList.remove('active');
+            playbackSpeedOptions.classList.remove('active');
+            qualityOptions.classList.remove('active');
+        }
+    });
+    
+    // Обработчики подменю скорости воспроизведения
+    playbackSpeedItem.addEventListener('click', function() {
+        playbackSpeedOptions.classList.toggle('active');
+        qualityOptions.classList.remove('active');
+    });
+    
+    speedOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            const speed = parseFloat(option.getAttribute('data-speed'));
+            videoPlayer.playbackRate = speed;
+            currentSpeed.textContent = `${speed}x`;
+            
+            speedOptions.forEach(opt => {
+                opt.classList.remove('active');
+            });
+            option.classList.add('active');
+        });
+    });
+    
+    // Обработчики подменю качества
+    qualityItem.addEventListener('click', function() {
+        qualityOptions.classList.toggle('active');
+        playbackSpeedOptions.classList.remove('active');
+    });
+    
+    qualityOptionsElements.forEach(option => {
+        option.addEventListener('click', function() {
+            const quality = option.getAttribute('data-quality');
+            currentQuality.textContent = quality;
+            
+            qualityOptionsElements.forEach(opt => {
+                opt.classList.remove('active');
+            });
+            option.classList.add('active');
+            
+            // Симуляция смены качества видео
+            console.log(`Качество изменено на ${quality}`);
+        });
+    });
+    
+    // Обработчик опции повтора
+    loopItem.addEventListener('click', function() {
+        videoPlayer.loop = !videoPlayer.loop;
+        loopStatus.textContent = videoPlayer.loop ? 'Вкл' : 'Выкл';
+    });
+    
+    // Обработчик для клавиатурного управления
+    document.addEventListener('keydown', function(e) {
+        if (document.activeElement.tagName === 'INPUT') return;
+        
+        switch (e.key) {
+            case ' ':
+            case 'k':
+                togglePlay();
+                e.preventDefault();
+                break;
+            case 'ArrowLeft':
+                videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - 5);
+                e.preventDefault();
+                break;
+            case 'ArrowRight':
+                videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + 5);
+                e.preventDefault();
+                break;
+            case 'f':
+                fullscreenBtn.click();
+                e.preventDefault();
+                break;
+            case 'm':
+                videoPlayer.muted = !videoPlayer.muted;
+                updateVolumeIcon();
+                e.preventDefault();
+                break;
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                const percent = parseInt(e.key) * 10;
+                videoPlayer.currentTime = videoPlayer.duration * (percent / 100);
+                e.preventDefault();
+                break;
+        }
+    });
+    
+    // Инициализация начальных состояний
+    updateVolumeIcon();
+    volumeLevel.style.width = `${videoPlayer.volume * 100}%`;
+});
+</script>
+{% endblock %}

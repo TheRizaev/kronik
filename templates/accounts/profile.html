@@ -1,0 +1,97 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block title %}Профиль - KRONIK{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <div class="profile-avatar">
+            {% if user.profile.profile_picture %}
+                <img src="{{ user.profile.profile_picture.url }}" alt="{{ user.profile.display_name|default:user.username }}">
+            {% else %}
+                <div class="avatar-placeholder">
+                    {% if user.profile.display_name %}
+                        {{ user.profile.display_name|first }}
+                    {% else %}
+                        {{ user.username|first }}
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+        <div class="profile-info">
+            <h2>{{ user.profile.display_name|default:user.username }}</h2>
+            <p class="profile-username">{{ user.username }}</p>
+            <p class="profile-email">{{ user.email }}</p>
+            <p class="profile-date">Дата регистрации: {{ user.profile.date_joined|date:"d.m.Y" }}</p>
+        </div>
+    </div>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <div class="profile-content">
+        <div class="profile-section">
+            <h3>Редактировать профиль</h3>
+            
+            <form method="POST" enctype="multipart/form-data" class="profile-form">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label for="id_display_name">Как к вам обращаться</label>
+                    {{ form.display_name }}
+                    {% if form.display_name.errors %}
+                        <div class="form-error">{{ form.display_name.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_profile_picture">Фото профиля</label>
+                    {{ form.profile_picture }}
+                    {% if form.profile_picture.errors %}
+                        <div class="form-error">{{ form.profile_picture.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_bio">О себе</label>
+                    {{ form.bio }}
+                    {% if form.bio.errors %}
+                        <div class="form-error">{{ form.bio.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <button type="submit" class="profile-save-button">Сохранить изменения</button>
+            </form>
+        </div>
+        
+        <div class="profile-section">
+            <h3>Мои курсы</h3>
+            <div class="profile-courses">
+                <p>У вас пока нет курсов.</p>
+            </div>
+        </div>
+        
+        <div class="profile-section">
+            <h3>История просмотров</h3>
+            <div class="profile-history">
+                <p>История просмотров пуста.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .profile-username {
+        color: var(--gray-color);
+        font-size: 0.9rem;
+        margin-top: -10px;
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block title %}KRONIK{% endblock %}
+
+{% block content %}
+<div class="category-filter">
+    <div class="category-chip active">Все</div>
+    {% for category in categories %}
+    <div class="category-chip">{{ category.name }}</div>
+    {% empty %}
+    <div class="category-chip">Программирование</div>
+    <div class="category-chip">Математика</div>
+    <div class="category-chip">Физика</div>
+    <div class="category-chip">Химия</div>
+    <div class="category-chip">История</div>
+    <div class="category-chip">Языки</div>
+    <div class="category-chip">Экономика</div>
+    <div class="category-chip">Биология</div>
+    {% endfor %}
+</div>
+
+<div class="videos-grid" id="videos-container">
+    <!-- Видео будут добавляться сюда через JavaScript -->
+</div>
+{% endblock %}
