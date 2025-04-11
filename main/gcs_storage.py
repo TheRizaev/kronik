@@ -3,36 +3,27 @@ import os
 import json
 from datetime import datetime
 from django.conf import settings
+import logging
 
-def find_json_file(start_dir=None, filename_part="kronik-26102005-6949b1ae3add.json"):
-    """
-    Расширенный поиск JSON-файла с ключом для Google Cloud
-    
-    Args:
-        start_dir (str, optional): Начальная директория для поиска. 
-                                   Если None, будет использован текущий проект.
-        filename_part (str): Часть имени файла для поиска
-    
-    Returns:
-        str: Полный путь к найденному файлу или None
-    """
+# Set up logging
+logger = logging.getLogger(__name__)
+
+BUCKET_NAME = "kronik-portage"
+
+def find_json_file(start_dir=None, filename_part="kronik-26102005-0ec8103ffcf3.json"):
     import os
     from django.conf import settings
-    
-    # Список возможных директорий для поиска
     search_dirs = [
-        os.getcwd(),  # Текущая рабочая директория
-        settings.BASE_DIR,  # Корень Django-проекта
-        os.path.join(settings.BASE_DIR, 'config'),  # Папка конфигурации
-        os.path.join(settings.BASE_DIR, 'credentials'),  # Папка с credentials
-        os.path.join(settings.BASE_DIR, 'keys'),  # Папка с ключами
+        os.getcwd(), 
+        settings.BASE_DIR,
+        os.path.join(settings.BASE_DIR, 'config'),
+        os.path.join(settings.BASE_DIR, 'credentials'),
+        os.path.join(settings.BASE_DIR, 'keys'),
     ]
     
-    # Если передана конкретная стартовая директория
     if start_dir:
         search_dirs.insert(0, start_dir)
     
-    # Расширенный поиск файла
     for root_dir in search_dirs:
         for root, dirs, files in os.walk(root_dir):
             matching_files = [
@@ -42,61 +33,23 @@ def find_json_file(start_dir=None, filename_part="kronik-26102005-6949b1ae3add.j
             ]
             
             if matching_files:
-                print(f"✅ Найден JSON-файл: {matching_files[0]}")
+                logger.info(f"Found JSON file: {matching_files[0]}")
                 return matching_files[0]
     
-    print("❌ JSON-файл для Google Cloud не найден!")
+    logger.error("JSON file for Google Cloud not found!")
     return None
 
 def init_gcs_client():
-    """
-    Инициализирует клиент Google Cloud Storage с расширенным поиском ключа
-    """
     try:
-        # Пытаемся найти ключ
         credentials_path = find_json_file()
-        
-        if not credentials_path:
-            # Если ключ не найден, пробуем использовать стандартную аутентификацию
-            from google.cloud import storage
-            return storage.Client()
-        
-        # Устанавливаем путь к ключу
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
         
-        # Инициализируем клиент
         from google.cloud import storage
         client = storage.Client()
         return client
     
     except Exception as e:
-        print(f"❌ Ошибка при инициализации клиента GCS: {e}")
-        return None
-    
-BUCKET_NAME = "kronik-portage"
-
-def create_bucket(bucket_name=BUCKET_NAME, storage_class="STANDARD", location="US"):
-    """Создаёт бакет в Google Cloud Storage"""
-    try:
-        # Инициализируем клиент с учетом нового пути к учетным данным
-        client = init_gcs_client()
-        if not client:
-            raise Exception("Не удалось инициализировать клиент GCS")
-
-        # Проверяем, существует ли бакет
-        if client.bucket(bucket_name).exists():
-            print(f"ℹ️ Бакет {bucket_name} уже существует")
-            return client.bucket(bucket_name)
-
-        # Создаём бакет
-        bucket = client.bucket(bucket_name)
-        bucket.storage_class = storage_class  # Класс хранения (STANDARD, NEARLINE и т. д.)
-        new_bucket = client.create_bucket(bucket, location=location)
-
-        print(f"✅ Бакет {new_bucket.name} создан в регионе {new_bucket.location}")
-        return new_bucket
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
+        logger.error(f"Error initializing GCS client: {e}")
         return None
 
 def connect_to_gcs():
@@ -106,49 +59,64 @@ def connect_to_gcs():
         buckets = list(client.list_buckets())
         
         if not buckets:
-            print("Нет доступных бакетов")
+            logger.info("No available buckets")
         else:
-            print("Доступные бакеты:")
+            logger.info("Available buckets:")
             for bucket in buckets:
-                print(f"- {bucket.name}")
+                logger.info(f"- {bucket.name}")
         
         return client
     except Exception as e:
-        print(f"Ошибка: {e}")
+        logger.error(f"Error connecting to GCS: {e}")
         return None
 
 def get_bucket(bucket_name=BUCKET_NAME):
     """Получает бакет по имени, создает если не существует"""
-    client = storage.Client()
-    bucket = client.bucket(bucket_name)
-    
-    if not bucket.exists():
-        return create_bucket(bucket_name)
-    
-    return bucket
+    try:
+        client = init_gcs_client()
+        if not client:
+            raise Exception("Failed to initialize GCS client")
+            
+        bucket = client.bucket(bucket_name)
+        
+        if not bucket.exists():
+            logger.info(f"Bucket {bucket_name} does not exist, creating it...")
+        
+        return bucket
+    except Exception as e:
+        logger.error(f"Error getting bucket: {e}")
+        return None
 
 def create_user_folder_structure(user_id):
-    """Создает структуру папок для пользователя"""
-    folder_types = ["videos", "thumbnails", "metadata", "comments"]
-    bucket = get_bucket()
-    
-    for folder_type in folder_types:
-        folder_path = f"{user_id}/{folder_type}/"
-        blob = bucket.blob(folder_path)
-        if not blob.exists():
-            # Создаем пустой файл как маркер папки (GCS не имеет реальных папок)
-            blob = bucket.blob(f"{folder_path}.keep")
-            blob.upload_from_string('')
-            print(f"✅ Создана папка {folder_path}")
-    
-    print(f"✅ Структура папок для пользователя {user_id} создана успешно")
+    try:
+        bucket = get_bucket()
+        if not bucket:
+            logger.error(f"Could not get bucket for user {user_id}")
+            return False
+        
+        # Define folder types to create
+        folder_types = ["videos", "previews", "metadata", "comments", "bio"]
+        
+        for folder_type in folder_types:
+            folder_path = f"{user_id}/{folder_type}/"
+            
+            # Create empty marker file since GCS doesn't have real folders
+            marker_blob = bucket.blob(f"{folder_path}.keep")
+            marker_blob.upload_from_string('')
+            logger.info(f"Created folder {folder_path}")
+        
+        logger.info(f"Successfully created folder structure for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error creating folder structure for user {user_id}: {str(e)}")
+        return False
 
 def upload_video(user_id, video_file_path, title=None, description=None):
     """
     Загружает видеофайл в хранилище и создает соответствующие метаданные
     
     Parameters:
-    - user_id: ID пользователя
+    - user_id: ID пользователя или username
     - video_file_path: Путь к видеофайлу на локальном компьютере
     - title: Название видео (опционально)
     - description: Описание видео (опционально)
@@ -157,6 +125,9 @@ def upload_video(user_id, video_file_path, title=None, description=None):
     - video_id: ID видео в формате даты и имени файла
     """
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for video upload")
+        return None
     
     # Создаем структуру папок, если она еще не существует
     create_user_folder_structure(user_id)
@@ -204,19 +175,22 @@ def upload_video(user_id, video_file_path, title=None, description=None):
         comments_blob = bucket.blob(comments_path)
         comments_blob.upload_from_string(json.dumps(comments, indent=2), content_type='application/json')
         
-        print(f"✅ Видео {video_id} успешно загружено")
+        logger.info(f"Video {video_id} successfully uploaded")
         return video_id
     
     except Exception as e:
-        print(f"❌ Ошибка при загрузке видео: {e}")
+        logger.error(f"Error uploading video: {e}")
         return None
 
 def upload_thumbnail(user_id, video_id, thumbnail_file_path):
     """Загружает миниатюру для видео"""
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for thumbnail upload")
+        return False
     
     file_extension = os.path.splitext(thumbnail_file_path)[1]
-    thumbnail_path = f"{user_id}/thumbnails/{video_id}{file_extension}"
+    thumbnail_path = f"{user_id}/previews/{video_id}{file_extension}"
     
     try:
         thumbnail_blob = bucket.blob(thumbnail_path)
@@ -231,16 +205,20 @@ def upload_thumbnail(user_id, video_id, thumbnail_file_path):
             metadata_content["thumbnail_path"] = thumbnail_path
             metadata_blob.upload_from_string(json.dumps(metadata_content, indent=2), content_type='application/json')
         
-        print(f"✅ Миниатюра для видео {video_id} успешно загружена")
+        logger.info(f"Thumbnail for video {video_id} successfully uploaded")
         return True
     
     except Exception as e:
-        print(f"❌ Ошибка при загрузке миниатюры: {e}")
+        logger.error(f"Error uploading thumbnail: {e}")
         return False
 
 def add_comment(user_id, video_id, comment_user_id, comment_text):
     """Добавляет комментарий к видео"""
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for adding comment")
+        return False
+        
     comments_path = f"{user_id}/comments/{video_id}_comments.json"
     
     try:
@@ -264,16 +242,20 @@ def add_comment(user_id, video_id, comment_user_id, comment_text):
         # Сохраняем обновленные комментарии
         comments_blob.upload_from_string(json.dumps(comments_data, indent=2), content_type='application/json')
         
-        print(f"✅ Комментарий добавлен к видео {video_id}")
+        logger.info(f"Comment added to video {video_id}")
         return True
     
     except Exception as e:
-        print(f"❌ Ошибка при добавлении комментария: {e}")
+        logger.error(f"Error adding comment: {e}")
         return False
 
 def get_video_metadata(user_id, video_id):
     """Получает метаданные видео"""
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for retrieving metadata")
+        return None
+        
     metadata_path = f"{user_id}/metadata/{video_id}.json"
     
     try:
@@ -282,16 +264,20 @@ def get_video_metadata(user_id, video_id):
         if metadata_blob.exists():
             return json.loads(metadata_blob.download_as_text())
         else:
-            print(f"❌ Метаданные для видео {video_id} не найдены")
+            logger.warning(f"Metadata for video {video_id} not found")
             return None
     
     except Exception as e:
-        print(f"❌ Ошибка при получении метаданных: {e}")
+        logger.error(f"Error retrieving metadata: {e}")
         return None
 
 def get_video_comments(user_id, video_id):
     """Получает комментарии к видео"""
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for retrieving comments")
+        return {"comments": []}
+        
     comments_path = f"{user_id}/comments/{video_id}_comments.json"
     
     try:
@@ -300,11 +286,11 @@ def get_video_comments(user_id, video_id):
         if comments_blob.exists():
             return json.loads(comments_blob.download_as_text())
         else:
-            print(f"❌ Комментарии для видео {video_id} не найдены")
+            logger.warning(f"Comments for video {video_id} not found")
             return {"comments": []}
     
     except Exception as e:
-        print(f"❌ Ошибка при получении комментариев: {e}")
+        logger.error(f"Error retrieving comments: {e}")
         return {"comments": []}
 
 def download_video(user_id, video_id, destination_folder="."):
@@ -312,14 +298,18 @@ def download_video(user_id, video_id, destination_folder="."):
     metadata = get_video_metadata(user_id, video_id)
     
     if not metadata or "file_path" not in metadata:
-        print(f"❌ Не удалось найти информацию о видео {video_id}")
+        logger.error(f"Could not find information about video {video_id}")
         return False
     
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for downloading video")
+        return False
+        
     video_blob = bucket.blob(metadata["file_path"])
     
     if not video_blob.exists():
-        print(f"❌ Видеофайл не найден в хранилище")
+        logger.error(f"Video file not found in storage")
         return False
     
     file_extension = os.path.splitext(metadata["file_path"])[1]
@@ -327,16 +317,20 @@ def download_video(user_id, video_id, destination_folder="."):
     
     try:
         video_blob.download_to_filename(destination_path)
-        print(f"✅ Видео {video_id} скачано в {destination_path}")
+        logger.info(f"Video {video_id} downloaded to {destination_path}")
         return destination_path
     
     except Exception as e:
-        print(f"❌ Ошибка при скачивании видео: {e}")
+        logger.error(f"Error downloading video: {e}")
         return False
 
 def increment_view_count(user_id, video_id):
     """Увеличивает счетчик просмотров видео"""
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for incrementing view count")
+        return None
+        
     metadata_path = f"{user_id}/metadata/{video_id}.json"
     
     try:
@@ -346,19 +340,23 @@ def increment_view_count(user_id, video_id):
             metadata = json.loads(metadata_blob.download_as_text())
             metadata["views"] = metadata.get("views", 0) + 1
             metadata_blob.upload_from_string(json.dumps(metadata, indent=2), content_type='application/json')
-            print(f"✅ Счетчик просмотров для видео {video_id} увеличен: {metadata['views']}")
+            logger.info(f"View count for video {video_id} increased to {metadata['views']}")
             return metadata["views"]
         else:
-            print(f"❌ Метаданные для видео {video_id} не найдены")
+            logger.warning(f"Metadata for video {video_id} not found")
             return None
     
     except Exception as e:
-        print(f"❌ Ошибка при обновлении счетчика просмотров: {e}")
+        logger.error(f"Error updating view count: {e}")
         return None
 
 def list_user_videos(user_id):
     """Возвращает список всех видео пользователя"""
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for listing videos")
+        return []
+        
     metadata_prefix = f"{user_id}/metadata/"
     
     videos_list = []
@@ -374,18 +372,21 @@ def list_user_videos(user_id):
         return videos_list
     
     except Exception as e:
-        print(f"❌ Ошибка при получении списка видео: {e}")
+        logger.error(f"Error getting video list: {e}")
         return []
 
 def delete_video(user_id, video_id):
     """Удаляет видео и все связанные файлы"""
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for deleting video")
+        return False
     
     # Получаем метаданные для определения путей файлов
     metadata = get_video_metadata(user_id, video_id)
     
     if not metadata:
-        print(f"❌ Метаданные для видео {video_id} не найдены, удаление невозможно")
+        logger.error(f"Metadata for video {video_id} not found, cannot delete")
         return False
     
     try:
@@ -394,47 +395,52 @@ def delete_video(user_id, video_id):
             video_blob = bucket.blob(metadata["file_path"])
             if video_blob.exists():
                 video_blob.delete()
-                print(f"✅ Видеофайл {video_id} удален")
+                logger.info(f"Video file {video_id} deleted")
         
         # Удаляем миниатюру
         if "thumbnail_path" in metadata:
             thumbnail_blob = bucket.blob(metadata["thumbnail_path"])
             if thumbnail_blob.exists():
                 thumbnail_blob.delete()
-                print(f"✅ Миниатюра видео {video_id} удалена")
+                logger.info(f"Thumbnail for video {video_id} deleted")
         
         # Удаляем метаданные
         metadata_path = f"{user_id}/metadata/{video_id}.json"
         metadata_blob = bucket.blob(metadata_path)
         if metadata_blob.exists():
             metadata_blob.delete()
-            print(f"✅ Метаданные видео {video_id} удалены")
+            logger.info(f"Metadata for video {video_id} deleted")
         
         # Удаляем комментарии
         comments_path = f"{user_id}/comments/{video_id}_comments.json"
         comments_blob = bucket.blob(comments_path)
         if comments_blob.exists():
             comments_blob.delete()
-            print(f"✅ Комментарии к видео {video_id} удалены")
+            logger.info(f"Comments for video {video_id} deleted")
         
-        print(f"✅ Видео {video_id} и все связанные файлы успешно удалены")
+        logger.info(f"Video {video_id} and all related files successfully deleted")
         return True
     
     except Exception as e:
-        print(f"❌ Ошибка при удалении видео: {e}")
+        logger.error(f"Error deleting video: {e}")
         return False
 
 def get_user_storage_usage(user_id):
     """Возвращает информацию об использовании хранилища пользователем"""
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for retrieving storage usage")
+        return None
+        
     user_prefix = f"{user_id}/"
     
     total_size = 0
     file_counts = {
         "videos": 0,
-        "thumbnails": 0,
+        "previews": 0,
         "metadata": 0,
-        "comments": 0
+        "comments": 0,
+        "bio": 0
     }
     
     try:
@@ -460,7 +466,7 @@ def get_user_storage_usage(user_id):
         return usage_info
     
     except Exception as e:
-        print(f"❌ Ошибка при получении информации об использовании хранилища: {e}")
+        logger.error(f"Error getting storage usage information: {e}")
         return None
 
 def generate_video_url(user_id, video_id, expiration_time=3600):
@@ -468,14 +474,18 @@ def generate_video_url(user_id, video_id, expiration_time=3600):
     metadata = get_video_metadata(user_id, video_id)
     
     if not metadata or "file_path" not in metadata:
-        print(f"❌ Не удалось найти информацию о видео {video_id}")
+        logger.error(f"Could not find information about video {video_id}")
         return None
     
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for generating URL")
+        return None
+        
     video_blob = bucket.blob(metadata["file_path"])
     
     if not video_blob.exists():
-        print(f"❌ Видеофайл не найден в хранилище")
+        logger.error(f"Video file not found in storage")
         return None
     
     try:
@@ -485,11 +495,11 @@ def generate_video_url(user_id, video_id, expiration_time=3600):
             method="GET"
         )
         
-        print(f"✅ Сгенерирована временная ссылка на видео {video_id} (действительна {expiration_time} секунд)")
+        logger.info(f"Generated temporary URL for video {video_id} (valid for {expiration_time} seconds)")
         return url
     
     except Exception as e:
-        print(f"❌ Ошибка при генерации ссылки: {e}")
+        logger.error(f"Error generating URL: {e}")
         return None
 
 def search_videos(query, user_id=None):
@@ -504,6 +514,9 @@ def search_videos(query, user_id=None):
     - Список найденных видео
     """
     bucket = get_bucket()
+    if not bucket:
+        logger.error(f"Could not get bucket for searching videos")
+        return []
     
     if user_id:
         prefix = f"{user_id}/metadata/"
@@ -547,44 +560,5 @@ def search_videos(query, user_id=None):
         return results
     
     except Exception as e:
-        print(f"❌ Ошибка при поиске видео: {e}")
+        logger.error(f"Error searching videos: {e}")
         return []
-
-# Пример использования
-if __name__ == "__main__":
-    # Создаём бакет
-    create_bucket()
-    
-    # Создаём структуру папок для пользователя
-    user_id = "user123"
-    # create_user_folder_structure(user_id)
-    
-    # # Пример загрузки видео (требуется указать локальный путь к файлу)
-    # video_path = "video.mp4"
-    # video_id = upload_video(user_id, video_path, "Моё тестовое видео", "Это описание видео")
-    
-    # # # Пример загрузки миниатюры
-    # thumbnail_path = "thumbnail.jpg"
-    # upload_thumbnail(user_id, video_id, thumbnail_path)
-    
-    # # # Получение метаданных
-    # metadata = get_video_metadata(user_id, video_id)
-    # print("Метаданные видео:", metadata)
-    
-    # # # Добавление комментария
-    # add_comment(user_id, video_id, "viewer1", "Отличное видео!")
-    
-    # # # Получение комментариев
-    # comments = get_video_comments(user_id, video_id)
-    # print("Комментарии к видео:", comments)
-    
-    # # # Увеличение счетчика просмотров
-    # increment_view_count(user_id, video_id)
-    
-    # # # Получение списка всех видео пользователя
-    # videos = list_user_videos(user_id)
-    # print(f"Всего видео пользователя {user_id}: {len(videos)}")
-    
-    # # # Генерация временной ссылки
-    # url = generate_video_url(user_id, video_id)
-    # print("Временная ссылка на видео:", url)

@@ -1,4 +1,4 @@
-# Update main/apps.py
+
 from django.apps import AppConfig
 
 class MainConfig(AppConfig):
@@ -6,4 +6,5 @@ class MainConfig(AppConfig):
     name = 'main'
     
     def ready(self):
-        import main.signals  # Import signals module to register signals
+        import main.signals  # Import signals module to register user profile signals
+        import main.gcs_utils  # Import GCS utils to register GCS folder creation signals
