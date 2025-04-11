@@ -12,7 +12,7 @@ def create_user_folder_structure(username):
     Creates the folder structure for a new user in Google Cloud Storage.
     
     Args:
-        username (str): The username of the user (without '@' prefix)
+        username (str): The username of the user (with '@' prefix)
         
     Returns:
         bool: True if successful, False otherwise
@@ -47,6 +47,10 @@ def create_user_folder_structure(username):
 
 @receiver(post_save, sender=User)
 def create_user_gcs_folders(sender, instance, created, **kwargs):
+    """
+    Signal handler to create GCS folders when a user is created.
+    Preserves the @ prefix in the username.
+    """
     if created:
         username = instance.username
         logger.info(f"New user created: {username}. Creating GCS folder structure...")

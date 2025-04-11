@@ -17,6 +17,10 @@ from django.core.paginator import Paginator
 from django.core.mail import send_mail
 from django.conf import settings
 import random
+import os
+import uuid
+import logging
+logger = logging.getLogger(__name__)
 
 def custom_page_not_found(request, exception):
     return render(request, 'main/404.html', status=404)
@@ -563,23 +567,89 @@ def logout_view(request):
 
 @login_required
 def profile_view(request):
-    # Check if email is verified
+    # Проверяем, подтвержден ли email
     if not request.user.profile.email_verified:
-        # If not verified, redirect to verification page
+        # Если не подтвержден, перенаправляем на страницу подтверждения
         return redirect('verify_email')
     
-    # Check if user details are completed
+    # Проверяем, заполнены ли данные пользователя
     if not request.user.profile.display_name:
         return redirect('user_details')
         
     if request.method == 'POST':
         form = UserProfileForm(request.POST, request.FILES, instance=request.user.profile)
         if form.is_valid():
-            form.save()
+            profile = form.save(commit=False)
+            
+            # Получаем имя пользователя для хранения в GCS (с префиксом @)
+            username = request.user.username
+            
+            # Обрабатываем фото профиля, если предоставлено
+            profile_picture_path = None
+            if request.FILES.get('profile_picture'):
+                # Создаем временный файл
+                temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
+                os.makedirs(temp_dir, exist_ok=True)
+                
+                # Получаем расширение файла
+                profile_pic = request.FILES['profile_picture']
+                file_name = profile_pic.name
+                file_extension = os.path.splitext(file_name)[1].lower()
+                
+                # Сохраняем загруженный файл временно
+                profile_picture_path = os.path.join(temp_dir, f"{uuid.uuid4()}{file_extension}")
+                with open(profile_picture_path, 'wb+') as destination:
+                    for chunk in profile_pic.chunks():
+                        destination.write(chunk)
+            
+            try:
+                # Обновляем профиль в GCS
+                from .gcs_storage import update_user_profile_in_gcs
+                
+                gcs_result = update_user_profile_in_gcs(
+                    user_id=username,
+                    display_name=profile.display_name,
+                    bio=profile.bio,
+                    profile_picture_path=profile_picture_path
+                )
+                
+                if not gcs_result:
+                    logger.warning(f"Не удалось обновить профиль в GCS для пользователя {username}")
+                
+                # Очищаем временный файл, если он был создан
+                if profile_picture_path and os.path.exists(profile_picture_path):
+                    os.remove(profile_picture_path)
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении профиля в GCS: {e}")
+                # Продолжаем сохранение профиля в базе данных, даже если обновление GCS не удалось
+                
+                # Очищаем временный файл, если он был создан
+                if profile_picture_path and os.path.exists(profile_picture_path):
+                    os.remove(profile_picture_path)
+            
+            # Сохраняем профиль в базе данных
+            profile.save()
             messages.success(request, 'Ваш профиль обновлен!')
             return redirect('profile')
     else:
         form = UserProfileForm(instance=request.user.profile)
+        
+        # Пытаемся загрузить информацию профиля из GCS для отображения
+        try:
+            username = request.user.username
+            
+            from .gcs_storage import get_user_profile_from_gcs
+            gcs_profile = get_user_profile_from_gcs(username)
+            
+            # Передаем данные профиля GCS в контекст шаблона, если они доступны
+            if gcs_profile:
+                return render(request, 'accounts/profile.html', {
+                    'form': form,
+                    'gcs_profile': gcs_profile
+                })
+        except Exception as e:
+            logger.error(f"Ошибка при получении профиля GCS: {e}")
     
     return render(request, 'accounts/profile.html', {'form': form})
 

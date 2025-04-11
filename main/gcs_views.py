@@ -21,17 +21,19 @@ from .gcs_storage import (
     list_user_videos,
     get_video_metadata,
     generate_video_url,
-    delete_video
+    delete_video,
+    get_bucket,
+    BUCKET_NAME
 )
 
 @login_required
 @require_http_methods(["POST"])
 def upload_video_to_gcs(request):
     """
-    Handler for uploading video to Google Cloud Storage with improved error handling
+    Обработчик загрузки видео в Google Cloud Storage с улучшенной обработкой ошибок
     """
     try:
-        # Get files and data from request
+        # Получаем файлы и данные из запроса
         video_file = request.FILES.get('video_file')
         thumbnail = request.FILES.get('thumbnail')
         title = request.POST.get('title')
@@ -39,25 +41,24 @@ def upload_video_to_gcs(request):
         category_id = request.POST.get('category')
         
         if not video_file or not title:
-            return JsonResponse({'error': 'Video and title are required'}, status=400)
+            return JsonResponse({'error': 'Видео и название обязательны'}, status=400)
         
-        # Create temp directory if it doesn't exist
+        # Создаем временную директорию, если она не существует
         temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
         os.makedirs(temp_dir, exist_ok=True)
         
-        # Get cleaned username for GCS storage
+        # Получаем имя пользователя для хранения в GCS (сохраняем префикс @)
         username = request.user.username
-        if username.startswith('@'):
-            username = username[1:]
+        # ВАЖНО: больше не удаляем префикс @, сохраняем его для GCS
         
-        # Save files temporarily on server
+        # Временно сохраняем файлы на сервере
         temp_video_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{video_file.name}")
         
         with open(temp_video_path, 'wb+') as destination:
             for chunk in video_file.chunks():
                 destination.write(chunk)
         
-        # Upload video to GCS
+        # Загружаем видео в GCS
         video_id = upload_video(
             user_id=username,
             video_file_path=temp_video_path,
@@ -65,13 +66,13 @@ def upload_video_to_gcs(request):
             description=description
         )
         
-        # If video upload failed
+        # Если загрузка видео не удалась
         if not video_id:
             if os.path.exists(temp_video_path):
                 os.remove(temp_video_path)
-            return JsonResponse({'error': 'Failed to upload video to Google Cloud Storage'}, status=500)
+            return JsonResponse({'error': 'Не удалось загрузить видео в Google Cloud Storage'}, status=500)
         
-        # If thumbnail exists, upload it too
+        # Если есть миниатюра, загружаем и её
         thumbnail_url = None
         if thumbnail:
             temp_thumbnail_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{thumbnail.name}")
@@ -81,12 +82,12 @@ def upload_video_to_gcs(request):
             
             thumbnail_success = upload_thumbnail(username, video_id, temp_thumbnail_path)
             
-            # Remove temporary thumbnail file
+            # Удаляем временный файл миниатюры
             if os.path.exists(temp_thumbnail_path):
                 os.remove(temp_thumbnail_path)
                 
             if thumbnail_success:
-                # Get thumbnail URL
+                # Получаем URL миниатюры
                 metadata = get_video_metadata(username, video_id)
                 if metadata and "thumbnail_path" in metadata:
                     thumbnail_url = generate_video_url(
@@ -96,25 +97,25 @@ def upload_video_to_gcs(request):
                         expiration_time=3600
                     )
         
-        # Remove temporary video file
+        # Удаляем временный файл видео
         if os.path.exists(temp_video_path):
             os.remove(temp_video_path)
         
-        # Get metadata for uploaded video
+        # Получаем метаданные для загруженного видео
         video_metadata = get_video_metadata(username, video_id)
         
-        # Generate temporary URL for video access
+        # Генерируем временный URL для доступа к видео
         video_url = generate_video_url(username, video_id, expiration_time=3600)
         
-        # Add URLs to metadata
+        # Добавляем URL в метаданные
         if video_metadata:
             video_metadata['url'] = video_url
             if thumbnail_url:
                 video_metadata['thumbnail_url'] = thumbnail_url
                 
-            # Create or update Video object in database if needed
+            # Создаем или обновляем объект Video в базе данных, если необходимо
             try:
-                # If category is used
+                # Если есть категория
                 category = None
                 if category_id:
                     try:
@@ -122,14 +123,14 @@ def upload_video_to_gcs(request):
                     except Category.DoesNotExist:
                         pass
                 
-                # Check if video already exists
+                # Проверяем, существует ли уже видео
                 video_obj, created = Video.objects.get_or_create(
                     title=title,
                     defaults={
-                        'channel_id': 1,  # Assume channel is already created
+                        'channel_id': 1,  # Предполагаем, что канал уже создан
                         'category': category,
                         'views': '0',
-                        'age_text': 'Just now',
+                        'age_text': 'Только что',
                         'duration': video_metadata.get('duration', '00:00'),
                     }
                 )
@@ -137,7 +138,7 @@ def upload_video_to_gcs(request):
                 video_metadata['video_db_id'] = video_obj.id
             except Exception as db_err:
                 logger.error(f"Error creating database record: {db_err}")
-                # Don't return error since video is already uploaded to GCS
+                # Не возвращаем ошибку, так как видео уже загружено в GCS
         
         return JsonResponse({
             'success': True,
@@ -152,23 +153,22 @@ def upload_video_to_gcs(request):
 @login_required
 def list_videos_from_gcs(request):
     """
-    Get user's video list from GCS with improved handling
+    Получает список видео пользователя из GCS с улучшенной обработкой
     """
     try:
         username = request.user.username
-        if username.startswith('@'):
-            username = username[1:]
+        # ВАЖНО: больше не удаляем префикс @, сохраняем его для GCS
             
         videos = list_user_videos(username)
         
-        # Add temporary URLs to each video
+        # Добавляем временные URL для каждого видео
         for video in videos:
             video_id = video.get('video_id')
             if video_id:
-                # URL for video
+                # URL для видео
                 video['url'] = generate_video_url(username, video_id, expiration_time=3600)
                 
-                # URL for thumbnail if it exists
+                # URL для миниатюры, если она существует
                 if 'thumbnail_path' in video:
                     video['thumbnail_url'] = generate_video_url(
                         username, 
@@ -186,10 +186,10 @@ def list_videos_from_gcs(request):
         logger.error(f"Error getting video list: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-# Improved function for URL generation
+# Улучшенная функция для генерации URL
 def generate_video_url(user_id, video_id, file_path=None, expiration_time=3600):
     """
-    Enhanced version for generating temporary URLs
+    Улучшенная версия для генерации временных URL
     """
     from .gcs_storage import get_bucket, get_video_metadata
     
@@ -199,14 +199,14 @@ def generate_video_url(user_id, video_id, file_path=None, expiration_time=3600):
             logger.error("Failed to get bucket")
             return None
             
-        # If specific file path provided (e.g., for thumbnail)
+        # Если указан конкретный путь к файлу (например, для миниатюры)
         if file_path:
             blob = bucket.blob(file_path)
             if not blob.exists():
                 logger.error(f"File not found at path: {file_path}")
                 return None
         else:
-            # Get video file path from metadata
+            # Получаем путь к файлу видео из метаданных
             metadata = get_video_metadata(user_id, video_id)
             if not metadata or "file_path" not in metadata:
                 logger.error(f"Could not find information about video {video_id}")
@@ -217,7 +217,7 @@ def generate_video_url(user_id, video_id, file_path=None, expiration_time=3600):
                 logger.error(f"Video file not found in storage")
                 return None
         
-        # Generate URL
+        # Генерируем URL
         url = blob.generate_signed_url(
             version="v4",
             expiration=expiration_time,
@@ -233,23 +233,22 @@ def generate_video_url(user_id, video_id, file_path=None, expiration_time=3600):
 @login_required
 def studio_view(request):
     """
-    View for the studio page with GCS integration
+    Представление для страницы студии с интеграцией GCS
     """
-    # Check if user is an author
+    # Проверяем, является ли пользователь автором
     if not request.user.profile.is_author:
-        messages.error(request, 'You don\'t have access to Studio. You need to become an author to gain access.')
+        messages.error(request, 'У вас нет доступа к Студии. Вы должны стать автором, чтобы получить доступ.')
         return redirect('become_author')
     
-    # Get user's videos from GCS
+    # Получаем видео пользователя из GCS
     username = request.user.username
-    if username.startswith('@'):
-        username = username[1:]
+    # ВАЖНО: больше не удаляем префикс @, сохраняем его для GCS
     
     try:
-        # Get user's videos
+        # Получаем видео пользователя
         videos = list_user_videos(username)
         
-        # Get categories for upload form
+        # Получаем категории для формы загрузки
         categories = Category.objects.all()
         
         return render(request, 'studio/studio.html', {
@@ -257,7 +256,7 @@ def studio_view(request):
             'categories': categories
         })
     except Exception as e:
-        messages.error(request, f'Error retrieving data: {e}')
+        messages.error(request, f'Ошибка при получении данных: {e}')
         
     return render(request, 'studio/studio.html', {
         'videos': []
@@ -267,19 +266,18 @@ def studio_view(request):
 @require_http_methods(["DELETE"])
 def delete_video_from_gcs(request, video_id):
     """
-    Delete video from GCS
+    Удаляет видео из GCS
     """
     try:
         username = request.user.username
-        if username.startswith('@'):
-            username = username[1:]
+        # ВАЖНО: больше не удаляем префикс @, сохраняем его для GCS
             
         success = delete_video(username, video_id)
         
         if success:
             return JsonResponse({'success': True})
         else:
-            return JsonResponse({'error': 'Failed to delete video'}, status=400)
+            return JsonResponse({'error': 'Не удалось удалить видео'}, status=400)
             
     except Exception as e:
         logger.error(f"Error deleting video: {str(e)}")
@@ -289,12 +287,11 @@ def delete_video_from_gcs(request, video_id):
 @require_http_methods(["GET"])
 def get_video_url(request, video_id):
     """
-    Get temporary URL for video
+    Получает временный URL для видео
     """
     try:
         username = request.user.username
-        if username.startswith('@'):
-            username = username[1:]
+        # ВАЖНО: больше не удаляем префикс @, сохраняем его для GCS
             
         url = generate_video_url(username, video_id, expiration_time=3600)
         
@@ -304,7 +301,7 @@ def get_video_url(request, video_id):
                 'url': url
             })
         else:
-            return JsonResponse({'error': 'Failed to generate URL'}, status=400)
+            return JsonResponse({'error': 'Не удалось сгенерировать URL'}, status=400)
             
     except Exception as e:
         logger.error(f"Error generating URL: {str(e)}")

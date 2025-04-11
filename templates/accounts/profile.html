@@ -1,13 +1,15 @@
 {% extends 'main/base.html' %}
 {% load static %}
 
-{% block title %}Профиль - KRONIK{% endblock %}
+{% block title %}Profile - KRONIK{% endblock %}
 
 {% block content %}
 <div class="profile-container">
     <div class="profile-header">
         <div class="profile-avatar">
-            {% if user.profile.profile_picture %}
+            {% if gcs_profile.avatar_url %}
+                <img src="{{ gcs_profile.avatar_url }}" alt="{{ user.profile.display_name|default:user.username }}">
+            {% elif user.profile.profile_picture %}
                 <img src="{{ user.profile.profile_picture.url }}" alt="{{ user.profile.display_name|default:user.username }}">
             {% else %}
                 <div class="avatar-placeholder">
@@ -23,7 +25,14 @@
             <h2>{{ user.profile.display_name|default:user.username }}</h2>
             <p class="profile-username">{{ user.username }}</p>
             <p class="profile-email">{{ user.email }}</p>
-            <p class="profile-date">Дата регистрации: {{ user.profile.date_joined|date:"d.m.Y" }}</p>
+            <p class="profile-date">Registered: {{ user.profile.date_joined|date:"d.m.Y" }}</p>
+            
+            {% if gcs_profile.stats %}
+            <div class="profile-stats">
+                <p>Videos: {{ gcs_profile.stats.videos_count|default:"0" }}</p>
+                <p>Total views: {{ gcs_profile.stats.total_views|default:"0" }}</p>
+            </div>
+            {% endif %}
         </div>
     </div>
     
@@ -37,61 +46,330 @@
     
     <div class="profile-content">
         <div class="profile-section">
-            <h3>Редактировать профиль</h3>
+            <h3>Edit Profile</h3>
             
             <form method="POST" enctype="multipart/form-data" class="profile-form">
                 {% csrf_token %}
                 
                 <div class="form-group">
-                    <label for="id_display_name">Как к вам обращаться</label>
+                    <label for="id_display_name">Display Name</label>
                     {{ form.display_name }}
                     {% if form.display_name.errors %}
                         <div class="form-error">{{ form.display_name.errors }}</div>
                     {% endif %}
+                    <small class="form-help">This name will be displayed in your profile and comments</small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="id_profile_picture">Фото профиля</label>
-                    {{ form.profile_picture }}
+                    <label for="id_profile_picture">Profile Picture</label>
+                    <div class="file-input-container">
+                        {{ form.profile_picture }}
+                        <div class="file-input-text">Drag an image here or click to select</div>
+                        {% if gcs_profile.avatar_url or user.profile.profile_picture %}
+                            <div class="current-picture">
+                                <p>Current picture:</p>
+                                <div class="picture-preview">
+                                    {% if gcs_profile.avatar_url %}
+                                        <img src="{{ gcs_profile.avatar_url }}" alt="Current profile picture">
+                                    {% elif user.profile.profile_picture %}
+                                        <img src="{{ user.profile.profile_picture.url }}" alt="Current profile picture">
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
                     {% if form.profile_picture.errors %}
                         <div class="form-error">{{ form.profile_picture.errors }}</div>
                     {% endif %}
+                    <small class="form-help">Recommended size: 300x300 pixels, max file size: 2MB</small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="id_bio">О себе</label>
+                    <label for="id_bio">About Me</label>
                     {{ form.bio }}
                     {% if form.bio.errors %}
                         <div class="form-error">{{ form.bio.errors }}</div>
                     {% endif %}
+                    <small class="form-help">Tell us about yourself, your interests and expertise</small>
                 </div>
                 
-                <button type="submit" class="profile-save-button">Сохранить изменения</button>
+                <button type="submit" class="profile-save-button">Save Changes</button>
             </form>
         </div>
         
+        {% if user.profile.is_author %}
         <div class="profile-section">
-            <h3>Мои курсы</h3>
-            <div class="profile-courses">
-                <p>У вас пока нет курсов.</p>
+            <h3>Author Statistics</h3>
+            
+            <div class="author-stats">
+                {% if gcs_profile.stats %}
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📹</div>
+                        <div class="stat-value">{{ gcs_profile.stats.videos_count|default:"0" }}</div>
+                        <div class="stat-label">Videos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👁️</div>
+                        <div class="stat-value">{{ gcs_profile.stats.total_views|default:"0" }}</div>
+                        <div class="stat-label">Total Views</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💾</div>
+                        <div class="stat-value">{{ gcs_profile.total_size_mb|default:"0" }} MB</div>
+                        <div class="stat-label">Storage Used</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📅</div>
+                        <div class="stat-value">{{ user.profile.date_joined|timesince }}</div>
+                        <div class="stat-label">Member For</div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="no-stats">No author statistics available yet.</p>
+                <a href="{% url 'studio' %}" class="btn btn-primary">Go to Studio</a>
+                {% endif %}
             </div>
         </div>
+        {% endif %}
         
         <div class="profile-section">
-            <h3>История просмотров</h3>
-            <div class="profile-history">
-                <p>История просмотров пуста.</p>
+            <h3>Recent Activity</h3>
+            <div class="profile-activity">
+                {% if gcs_profile and gcs_profile.stats.videos_count > 0 %}
+                <p>You've uploaded {{ gcs_profile.stats.videos_count }} video{% if gcs_profile.stats.videos_count != 1 %}s{% endif %}.</p>
+                <a href="{% url 'studio' %}" class="btn btn-secondary">View Your Videos</a>
+                {% else %}
+                <p>No recent activity. Start by uploading videos or engaging with content!</p>
+                {% if user.profile.is_author %}
+                <a href="{% url 'studio' %}" class="btn btn-primary">Upload a Video</a>
+                {% else %}
+                <a href="{% url 'become_author' %}" class="btn btn-primary">Become an Author</a>
+                {% endif %}
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
 <style>
-    .profile-username {
-        color: var(--gray-color);
+    /* Additional styles for profile enhancements */
+    .profile-stats {
+        margin-top: 10px;
+        background-color: rgba(159, 37, 88, 0.1);
+        border-radius: 8px;
+        padding: 10px 15px;
+        display: inline-block;
+    }
+    
+    .profile-stats p {
+        margin: 5px 0;
         font-size: 0.9rem;
-        margin-top: -10px;
+    }
+    
+    .file-input-container {
+        position: relative;
+        padding: 30px;
+        border: 2px dashed rgba(159, 37, 88, 0.3);
+        border-radius: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        background-color: rgba(159, 37, 88, 0.05);
+    }
+    
+    .file-input-container:hover {
+        border-color: var(--accent-color);
+        background-color: rgba(159, 37, 88, 0.1);
+    }
+    
+    .file-input-container input[type="file"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+    
+    .current-picture {
+        margin-top: 15px;
+        text-align: center;
+    }
+    
+    .picture-preview {
+        width: 120px;
+        height: 120px;
+        margin: 10px auto;
+        border-radius: 50%;
+        overflow: hidden;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    }
+    
+    .picture-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .stat-card {
+        background-color: rgba(159, 37, 88, 0.05);
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        transition: transform 0.3s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        background-color: rgba(159, 37, 88, 0.1);
+    }
+    
+    .stat-icon {
+        font-size: 24px;
         margin-bottom: 10px;
     }
+    
+    .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: var(--accent-color);
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        color: var(--gray-color);
+        font-size: 14px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        border-radius: 30px;
+        margin-top: 15px;
+        font-weight: bold;
+        text-decoration: none;
+        transition: all 0.3s;
+    }
+    
+    .btn-primary {
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7d1e46;
+        transform: translateY(-3px);
+    }
+    
+    .btn-secondary {
+        background-color: transparent;
+        color: var(--accent-color);
+        border: 2px solid var(--accent-color);
+    }
+    
+    .btn-secondary:hover {
+        background-color: rgba(159, 37, 88, 0.1);
+        transform: translateY(-3px);
+    }
+    
+    .no-stats, .profile-activity p {
+        color: var(--gray-color);
+        font-style: italic;
+        text-align: center;
+        margin: 20px 0;
+    }
 </style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle file input styling
+        const fileInput = document.getElementById('id_profile_picture');
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const fileName = this.files[0].name;
+                    this.parentNode.querySelector('.file-input-text').textContent = fileName;
+                    
+                    // Create preview if it doesn't exist
+                    let previewContainer = document.querySelector('.current-picture');
+                    if (!previewContainer) {
+                        previewContainer = document.createElement('div');
+                        previewContainer.className = 'current-picture';
+                        previewContainer.innerHTML = '<p>Selected picture:</p><div class="picture-preview"></div>';
+                        this.parentNode.appendChild(previewContainer);
+                    } else {
+                        previewContainer.querySelector('p').textContent = 'Selected picture:';
+                    }
+                    
+                    // Update preview image
+                    const previewImg = previewContainer.querySelector('.picture-preview');
+                    previewImg.innerHTML = '';
+                    
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(this.files[0]);
+                    img.alt = 'Profile picture preview';
+                    previewImg.appendChild(img);
+                }
+            });
+        }
+        
+        // Drag and drop functionality
+        const fileContainer = document.querySelector('.file-input-container');
+        if (fileContainer) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                fileContainer.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                fileContainer.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                fileContainer.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                fileContainer.style.borderColor = var(--accent-color);
+                fileContainer.style.backgroundColor = 'rgba(159, 37, 88, 0.1)';
+                fileContainer.style.boxShadow = '0 0 10px rgba(159, 37, 88, 0.3)';
+            }
+            
+            function unhighlight() {
+                fileContainer.style.borderColor = '';
+                fileContainer.style.backgroundColor = '';
+                fileContainer.style.boxShadow = '';
+            }
+            
+            fileContainer.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                
+                if (files && files.length > 0) {
+                    fileInput.files = files;
+                    
+                    // Trigger change event
+                    const event = new Event('change');
+                    fileInput.dispatchEvent(event);
+                }
+            }
+        }
+    });
+</script>
 {% endblock %}

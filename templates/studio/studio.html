@@ -13,7 +13,7 @@
         </button>
     </div>
 
-    <!-- Upload Form Modal -->
+    <!-- Модальное окно формы загрузки -->
     <div id="uploadModal" class="upload-modal">
         <div class="upload-modal-content">
             <div class="upload-modal-header">
@@ -50,7 +50,7 @@
                 <form id="uploadForm" enctype="multipart/form-data">
                     {% csrf_token %}
                     <div class="form-group">
-                        <label for="video_file">Видео файл <span class="required">*</span></label>
+                        <label for="video_file">Видеофайл <span class="required">*</span></label>
                         <div class="file-input-container">
                             <input type="file" id="video_file" name="video_file" accept="video/*" required>
                             <div class="file-input-text">Перетащите видео сюда или нажмите для выбора</div>
@@ -86,7 +86,8 @@
                             {% for category in categories %}
                                 <option value="{{ category.id }}">{{ category.name }}</option>
                             {% endfor %}
-                            <!-- Заглушки если категории не загрузились -->
+                            {% if not categories %}
+                            <!-- Резервные опции, если категории не загрузились -->
                             <option value="1">Программирование</option>
                             <option value="2">Математика</option>
                             <option value="3">Физика</option>
@@ -94,6 +95,7 @@
                             <option value="5">История</option>
                             <option value="6">Биология</option>
                             <option value="7">Экономика</option>
+                            {% endif %}
                         </select>
                     </div>
                     
@@ -106,7 +108,7 @@
                 <div class="upload-success" style="display: none;">
                     <div class="success-icon">✅</div>
                     <h3>Видео успешно загружено!</h3>
-                    <p>Ваше видео было успешно загружено и будет доступно после обработки.</p>
+                    <p>Ваше видео загружено и будет доступно после обработки.</p>
                     <button class="close-success-btn">Закрыть</button>
                 </div>
             </div>
@@ -118,7 +120,7 @@
         <div class="tab" data-tab="analytics">Аналитика</div>
         <div class="tab" data-tab="comments">Комментарии</div>
         <div class="tab" data-tab="monetization">Монетизация</div>
-        <div class="tab" data-tab="customization">Настройка</div>
+        <div class="tab" data-tab="customization">Настройки</div>
     </div>
 
     <div class="tab-content" id="videos-content">
@@ -145,28 +147,29 @@
         <div class="studio-videos-list">
             {% if videos %}
                 {% for video in videos %}
-                <div class="studio-video-item">
+                <div class="studio-video-item" data-id="{{ video.video_id }}">
                     <div class="video-thumbnail">
-                        {% if video.thumbnail %}
-                            <img src="{{ video.thumbnail.url }}" alt="{{ video.title }}">
+                        {% if video.thumbnail_url %}
+                            <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}">
                         {% else %}
                             <div class="placeholder-thumbnail">🐰</div>
                         {% endif %}
-                        <span class="video-duration">{{ video.duration }}</span>
+                        <span class="video-duration">{{ video.duration|default:"00:00" }}</span>
                     </div>
                     <div class="video-details">
                         <h3 class="video-title">{{ video.title }}</h3>
                         <div class="video-meta">
-                            {{ video.views }} просмотров • {{ video.upload_date|date:"d.m.Y" }}
+                            {{ video.views|default:"0" }} просмотров • {{ video.upload_date|slice:":10" }}
                         </div>
-                        <div class="video-category">
-                            Категория: {{ video.category|default:"Без категории" }}
+                        <div class="video-description" style="max-height: 40px; overflow: hidden; text-overflow: ellipsis;">
+                            {{ video.description|truncatechars:100 }}
                         </div>
                     </div>
                     <div class="video-actions">
-                        <button class="action-btn edit-btn" data-id="{{ video.id }}">✏️ Редактировать</button>
-                        <button class="action-btn stats-btn" data-id="{{ video.id }}">📊 Статистика</button>
-                        <button class="action-btn delete-btn" data-id="{{ video.id }}">🗑️ Удалить</button>
+                        <a href="/video/{{ video.video_id }}" class="action-btn view-btn" target="_blank">👁️ Смотреть</a>
+                        <button class="action-btn edit-btn" data-id="{{ video.video_id }}">✏️ Редактировать</button>
+                        <button class="action-btn stats-btn" data-id="{{ video.video_id }}">📊 Статистика</button>
+                        <button class="action-btn delete-btn" data-id="{{ video.video_id }}">🗑️ Удалить</button>
                     </div>
                 </div>
                 {% endfor %}
@@ -184,39 +187,94 @@
     </div>
 
     <div class="tab-content hidden" id="analytics-content">
-        <!-- Аналитика содержимое -->
+        <div class="analytics-dashboard">
+            <h3>Аналитика канала</h3>
+            
+            <div class="analytics-overview">
+                <div class="analytics-card">
+                    <div class="analytics-title">Просмотры</div>
+                    <div class="analytics-value">0</div>
+                    <div class="analytics-change positive">+0% по сравнению с прошлым периодом</div>
+                </div>
+                <div class="analytics-card">
+                    <div class="analytics-title">Время просмотра (часы)</div>
+                    <div class="analytics-value">0</div>
+                    <div class="analytics-change positive">+0% по сравнению с прошлым периодом</div>
+                </div>
+                <div class="analytics-card">
+                    <div class="analytics-title">Подписчики</div>
+                    <div class="analytics-value">0</div>
+                    <div class="analytics-change positive">+0% по сравнению с прошлым периодом</div>
+                </div>
+                <div class="analytics-card">
+                    <div class="analytics-title">Доход</div>
+                    <div class="analytics-value">₽0.00</div>
+                    <div class="analytics-change positive">+0% по сравнению с прошлым периодом</div>
+                </div>
+            </div>
+            
+            <div class="analytics-chart-container">
+                <div class="chart-placeholder">
+                    <h3>Аналитика появится после просмотра ваших видео</h3>
+                    <p>Поделитесь своими видео, чтобы увидеть здесь данные аналитики</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="tab-content hidden" id="comments-content">
-        <!-- Комментарии содержимое -->
+        <div class="comments-dashboard">
+            <h3>Панель комментариев</h3>
+            <p style="text-align: center; padding: 50px 0;">Комментариев пока нет. Комментарии к вашим видео появятся здесь.</p>
+        </div>
     </div>
 
     <div class="tab-content hidden" id="monetization-content">
-        <!-- Монетизация содержимое -->
+        <div class="monetization-dashboard">
+            <h3>Монетизация</h3>
+            
+            <div class="monetization-status">
+                <div class="status-icon">💎</div>
+                <div class="status-details">
+                    <h3>Монетизация пока недоступна</h3>
+                    <p>Функции монетизации будут доступны после выполнения следующих требований:</p>
+                    <ul>
+                        <li>Создайте не менее 10 образовательных видео</li>
+                        <li>Наберите 1000+ просмотров в общей сложности</li>
+                        <li>Пройдите проверку контента командой KRONIK</li>
+                    </ul>
+                    <p>Продолжайте создавать качественный образовательный контент, и скоро вы сможете начать монетизацию!</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="tab-content hidden" id="customization-content">
-        <!-- Настройка содержимое -->
+        <div class="customization-dashboard">
+            <h3>Настройки канала</h3>
+            <p style="text-align: center; padding: 50px 0;">Настройки канала скоро будут доступны.</p>
+        </div>
     </div>
 </div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Tab switching functionality
+    // Переключение вкладок
     const tabs = document.querySelectorAll('.tab');
     
     tabs.forEach(tab => {
         tab.addEventListener('click', function() {
-            // Remove active class from all tabs
+            // Удаляем активный класс со всех вкладок
             tabs.forEach(t => t.classList.remove('active'));
             
-            // Add active class to clicked tab
+            // Добавляем активный класс на нажатую вкладку
             this.classList.add('active');
             
-            // Hide all tab content
+            // Скрываем все содержимое вкладок
             const allContent = document.querySelectorAll('.tab-content');
             allContent.forEach(content => content.classList.add('hidden'));
             
-            // Show selected tab content
+            // Показываем выбранное содержимое вкладки
             const tabName = this.getAttribute('data-tab');
             const selectedContent = document.getElementById(`${tabName}-content`);
             if (selectedContent) {
@@ -225,25 +283,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Modal functionality
+    // Функциональность модального окна
     const modal = document.getElementById('uploadModal');
     const showModalBtn = document.getElementById('showUploadForm');
     const closeModalBtn = document.querySelector('.close-modal');
     const cancelBtn = document.querySelector('.upload-cancel-btn');
     const emptyStateUploadBtn = document.getElementById('emptyStateUploadBtn');
     
-    // Show modal
+    // Показать модальное окно
     function showModal() {
         modal.style.display = 'block';
-        document.body.style.overflow = 'hidden'; // Prevent scrolling
+        document.body.style.overflow = 'hidden'; // Запретить прокрутку
     }
     
-    // Hide modal
+    // Скрыть модальное окно
     function hideModal() {
         modal.style.display = 'none';
-        document.body.style.overflow = ''; // Restore scrolling
+        document.body.style.overflow = ''; // Восстановить прокрутку
         
-        // Reset form
+        // Сбросить форму
         document.getElementById('uploadForm').reset();
         document.querySelector('.file-preview').style.display = 'none';
         document.querySelector('.thumbnail-preview').style.display = 'none';
@@ -257,14 +315,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (cancelBtn) cancelBtn.addEventListener('click', hideModal);
     if (emptyStateUploadBtn) emptyStateUploadBtn.addEventListener('click', showModal);
     
-    // Close modal when clicking outside
+    // Закрыть модальное окно при клике вне его
     window.addEventListener('click', function(event) {
         if (event.target === modal) {
             hideModal();
         }
     });
     
-    // File input preview
+    // Предпросмотр файлов
     const videoInput = document.getElementById('video_file');
     const thumbnailInput = document.getElementById('thumbnail');
     const videoPreview = document.querySelector('.file-preview');
@@ -274,10 +332,10 @@ document.addEventListener('DOMContentLoaded', function() {
         videoInput.addEventListener('change', function() {
             if (this.files && this.files[0]) {
                 const file = this.files[0];
-                // Update file input text
+                // Обновить текст в поле ввода файла
                 this.parentNode.querySelector('.file-input-text').textContent = file.name;
                 
-                // Show video preview
+                // Показать предпросмотр видео
                 videoPreview.innerHTML = `
                     <video controls>
                         <source src="${URL.createObjectURL(file)}" type="${file.type}">
@@ -297,12 +355,12 @@ document.addEventListener('DOMContentLoaded', function() {
         thumbnailInput.addEventListener('change', function() {
             if (this.files && this.files[0]) {
                 const file = this.files[0];
-                // Update file input text
+                // Обновить текст в поле ввода файла
                 this.parentNode.querySelector('.file-input-text').textContent = file.name;
                 
-                // Show thumbnail preview
+                // Показать предпросмотр миниатюры
                 thumbnailPreview.innerHTML = `
-                    <img src="${URL.createObjectURL(file)}" alt="Превью миниатюры">
+                    <img src="${URL.createObjectURL(file)}" alt="Предпросмотр миниатюры">
                     <div class="file-info">
                         <div>Имя: ${file.name}</div>
                         <div>Размер: ${formatFileSize(file.size)}</div>
@@ -313,7 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Format file size
+    // Форматирование размера файла
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Байт';
         const k = 1024;
@@ -322,14 +380,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
     
-    // Form submission
+    // Отправка формы
     const uploadForm = document.getElementById('uploadForm');
     
     if (uploadForm) {
         uploadForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Validate form
+            // Валидация формы
             const videoFile = document.getElementById('video_file').files[0];
             const title = document.getElementById('title').value.trim();
             
@@ -343,122 +401,174 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Show progress container
+            // Показать контейнер прогресса
             const progressContainer = document.querySelector('.upload-progress-container');
             progressContainer.style.display = 'block';
             
-            // Hide form
+            // Скрыть форму
             uploadForm.style.display = 'none';
             
-            // Create FormData object
+            // Создать объект FormData
             const formData = new FormData(uploadForm);
             
-            // Simulate upload process with GCS
-            simulateUpload(formData);
+            // Установить текущий шаг на "загрузка"
+            updateStep('upload');
+            
+            // Загрузить данные через AJAX на Django бэкенд
+            uploadToGCS(formData);
         });
     }
     
-    // Function to simulate the upload process with GCS integration
-    function simulateUpload(formData) {
+    // Функция для загрузки в GCS через Django бэкенд
+    function uploadToGCS(formData) {
         const progressBar = document.querySelector('.progress-bar');
         const progressPercentage = document.querySelector('.progress-percentage');
         const progressMessage = document.querySelector('.progress-message');
-        const steps = document.querySelectorAll('.upload-step');
         
-        // Set current step to "upload"
-        updateStep('upload');
+        // Начальное сообщение
+        progressMessage.textContent = 'Подготовка видео для загрузки...';
         
-        let progress = 0;
-        const interval = setInterval(function() {
-            progress += 5;
-            progressBar.style.width = progress + '%';
-            progressPercentage.textContent = progress + '%';
-            
-            if (progress === 50) {
-                progressMessage.textContent = 'Загрузка видео в Google Cloud Storage...';
-            }
-            
-            if (progress === 75) {
-                updateStep('process');
-                progressMessage.textContent = 'Обработка видео...';
-            }
-            
-            if (progress >= 100) {
-                clearInterval(interval);
-                progressBar.style.width = '100%';
-                progressPercentage.textContent = '100%';
-                progressMessage.textContent = 'Загрузка завершена!';
-                updateStep('complete');
+        // Создать объект XHR для отслеживания прогресса
+        const xhr = new XMLHttpRequest();
+        
+        // Отслеживание прогресса загрузки
+        xhr.upload.addEventListener('progress', function(e) {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = percent + '%';
+                progressPercentage.textContent = percent + '%';
                 
-                // In a real implementation, this is where you would make an AJAX call to upload to GCS
-                // For demonstration, we'll show success after a delay
-                setTimeout(function() {
-                    document.querySelector('.upload-progress-container').style.display = 'none';
-                    document.querySelector('.upload-success').style.display = 'block';
-                }, 1000);
-            }
-        }, 200);
-        
-        // Function to update the current step in progress indicator
-        function updateStep(stepName) {
-            steps.forEach(step => {
-                if (step.getAttribute('data-step') === stepName) {
-                    step.classList.add('active');
-                    
-                    // Mark previous steps as complete
-                    let prevStep = step.previousElementSibling;
-                    while (prevStep) {
-                        prevStep.classList.remove('active');
-                        prevStep.classList.add('complete');
-                        prevStep = prevStep.previousElementSibling;
-                    }
+                if (percent > 0 && percent <= 33) {
+                    progressMessage.textContent = 'Загрузка видео в Google Cloud Storage...';
+                } else if (percent > 33 && percent <= 66) {
+                    updateStep('process');
+                    progressMessage.textContent = 'Обработка видео...';
+                } else if (percent > 66) {
+                    progressMessage.textContent = 'Создание метаданных и завершение...';
                 }
-            });
+            }
+        });
+        
+        // Обработка завершенного запроса
+        xhr.addEventListener('load', function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                // Успех
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.success) {
+                        // Завершение прогресс-бара
+                        progressBar.style.width = '100%';
+                        progressPercentage.textContent = '100%';
+                        progressMessage.textContent = 'Загрузка завершена!';
+                        updateStep('complete');
+                        
+                        // Показать сообщение об успехе
+                        setTimeout(function() {
+                            document.querySelector('.upload-progress-container').style.display = 'none';
+                            document.querySelector('.upload-success').style.display = 'block';
+                        }, 1000);
+                        
+                        // Обновить список видео после успешной загрузки
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 3000);
+                    } else {
+                        throw new Error(response.error || 'Загрузка не удалась');
+                    }
+                } catch (error) {
+                    handleUploadError(error);
+                }
+            } else {
+                // Ошибка
+                handleUploadError(new Error('Сервер вернул статус ' + xhr.status));
+            }
+        });
+        
+        // Обработка сетевых ошибок
+        xhr.addEventListener('error', function() {
+            handleUploadError(new Error('Произошла сетевая ошибка'));
+        });
+        
+        // Обработка таймаута
+        xhr.addEventListener('timeout', function() {
+            handleUploadError(new Error('Превышено время ожидания загрузки'));
+        });
+        
+        // Настройка запроса
+        xhr.open('POST', '/api/upload-video/', true);
+        xhr.setRequestHeader('X-CSRFToken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        
+        // Отправить данные формы
+        xhr.send(formData);
+    }
+    
+    // Функция для обработки ошибок загрузки
+    function handleUploadError(error) {
+        console.error('Ошибка:', error);
+        const progressMessage = document.querySelector('.progress-message');
+        progressMessage.textContent = 'Ошибка загрузки: ' + error.message;
+        progressMessage.style.color = '#ff4757';
+        
+        // Добавить кнопку повтора
+        const retryButton = document.createElement('button');
+        retryButton.textContent = 'Повторить';
+        retryButton.className = 'retry-button';
+        retryButton.style.marginTop = '15px';
+        retryButton.style.padding = '8px 20px';
+        retryButton.style.backgroundColor = '#9f2558';
+        retryButton.style.color = 'white';
+        retryButton.style.border = 'none';
+        retryButton.style.borderRadius = '5px';
+        retryButton.style.cursor = 'pointer';
+        
+        retryButton.addEventListener('click', function() {
+            // Сбросить форму и прогресс
+            document.querySelector('.upload-progress-container').style.display = 'none';
+            document.getElementById('uploadForm').style.display = 'block';
+            document.querySelector('.progress-bar').style.width = '0%';
+            document.querySelector('.progress-percentage').textContent = '0%';
+            progressMessage.textContent = '';
+            progressMessage.style.color = '';
+            this.remove(); // Удалить кнопку повтора
+        });
+        
+        // Проверить, существует ли уже кнопка, чтобы избежать дубликатов
+        const existingButton = document.querySelector('.retry-button');
+        if (!existingButton) {
+            document.querySelector('.upload-progress-container').appendChild(retryButton);
         }
     }
     
-    // In a real implementation, this would make a POST request to your Django backend
-    function uploadToGCS(formData) {
-        return fetch('/api/upload-video/', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    // Функция для обновления текущего шага в индикаторе прогресса
+    function updateStep(stepName) {
+        const steps = document.querySelectorAll('.upload-step');
+        
+        steps.forEach(step => {
+            if (step.getAttribute('data-step') === stepName) {
+                step.classList.add('active');
+                
+                // Отметить предыдущие шаги как выполненные
+                let prevStep = step.previousElementSibling;
+                while (prevStep) {
+                    prevStep.classList.remove('active');
+                    prevStep.classList.add('complete');
+                    prevStep = prevStep.previousElementSibling;
+                }
             }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
         });
     }
     
-    // Close success message
-    const closeSuccessBtn = document.querySelector('.close-success-btn');
-    if (closeSuccessBtn) {
-        closeSuccessBtn.addEventListener('click', function() {
-            hideModal();
-            // In a real implementation, you might want to refresh the video list
-            // window.location.reload();
-        });
-    }
-    
-    // Delete video button functionality
-    const deleteButtons = document.querySelectorAll('.delete-btn');
-    deleteButtons.forEach(button => {
+    // Функциональность удаления видео
+    document.querySelectorAll('.delete-btn').forEach(button => {
         button.addEventListener('click', function() {
             const videoId = this.getAttribute('data-id');
-            if (confirm('Вы уверены, что хотите удалить это видео?')) {
-                // Here you would make an AJAX call to delete the video from GCS
-                console.log('Удаление видео с ID:', videoId);
-                // In a real implementation:
-                // deleteVideoFromGCS(videoId);
+            if (confirm('Вы уверены, что хотите удалить это видео? Это действие нельзя отменить.')) {
+                deleteVideoFromGCS(videoId);
             }
         });
     });
     
-    // Function to delete video from GCS (simulated)
+    // Функция для удаления видео из GCS
     function deleteVideoFromGCS(videoId) {
         fetch(`/api/delete-video/${videoId}/`, {
             method: 'DELETE',
@@ -468,44 +578,80 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error('Ошибка сети');
             }
             return response.json();
         })
         .then(data => {
-            // Remove video from DOM
-            document.querySelector(`.studio-video-item[data-id="${videoId}"]`).remove();
+            if (data.success) {
+                // Удалить карточку видео из DOM
+                const videoElement = document.querySelector(`.studio-video-item[data-id="${videoId}"]`);
+                if (videoElement) {
+                    videoElement.remove();
+                    
+                    // Показать сообщение
+                    const message = document.createElement('div');
+                    message.className = 'alert alert-success';
+                    message.textContent = 'Видео успешно удалено';
+                    message.style.padding = '10px 15px';
+                    message.style.marginBottom = '15px';
+                    message.style.backgroundColor = 'rgba(46, 204, 113, 0.1)';
+                    message.style.borderLeft = '3px solid #2ecc71';
+                    message.style.borderRadius = '4px';
+                    document.querySelector('.studio-videos-list').prepend(message);
+                    
+                    // Удалить сообщение через 3 секунды
+                    setTimeout(() => {
+                        message.remove();
+                    }, 3000);
+                    
+                    // Если видео больше нет, показать пустое состояние
+                    if (document.querySelectorAll('.studio-video-item').length === 0) {
+                        document.querySelector('.studio-videos-list').innerHTML = `
+                            <div class="no-videos">
+                                <div class="empty-state">
+                                    <div class="empty-icon">🐰</div>
+                                    <h3>У вас пока нет загруженных видео</h3>
+                                    <p>Загрузите свое первое видео, чтобы начать делиться знаниями</p>
+                                    <button class="upload-button" id="emptyStateUploadBtn">Загрузить видео</button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Добавить событие клика на новую кнопку
+                        document.getElementById('emptyStateUploadBtn').addEventListener('click', showModal);
+                    }
+                }
+            } else {
+                throw new Error(data.error || 'Не удалось удалить');
+            }
         })
         .catch(error => {
-            console.error('Error deleting video:', error);
-            alert('Произошла ошибка при удалении видео.');
+            console.error('Ошибка:', error);
+            alert('Ошибка при удалении видео: ' + error.message);
         });
     }
     
-    // Edit video button functionality
-    const editButtons = document.querySelectorAll('.edit-btn');
-    editButtons.forEach(button => {
+    // Функциональность редактирования видео (заглушка)
+    document.querySelectorAll('.edit-btn').forEach(button => {
         button.addEventListener('click', function() {
             const videoId = this.getAttribute('data-id');
-            console.log('Редактирование видео с ID:', videoId);
-            // In a real implementation, you would fetch video details and populate a form
-            alert('Редактирование видео будет доступно в следующем обновлении');
+            alert('Функциональность редактирования видео будет доступна в следующем обновлении.');
         });
     });
     
-    // Stats button functionality
-    const statsButtons = document.querySelectorAll('.stats-btn');
-    statsButtons.forEach(button => {
+    // Кнопка статистики
+    document.querySelectorAll('.stats-btn').forEach(button => {
         button.addEventListener('click', function() {
             const videoId = this.getAttribute('data-id');
-            console.log('Просмотр статистики видео с ID:', videoId);
-            // Switch to analytics tab and show specific video stats
+            // Переключиться на вкладку аналитики
             document.querySelector('[data-tab="analytics"]').click();
         });
     });
     
-    // Drag and drop file upload
+    // Перетаскивание файлов для загрузки видео и миниатюры
     const fileContainers = document.querySelectorAll('.file-input-container');
+    
     fileContainers.forEach(container => {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             container.addEventListener(eventName, preventDefaults, false);
@@ -540,14 +686,37 @@ document.addEventListener('DOMContentLoaded', function() {
             const files = dt.files;
             
             if (files.length > 0) {
-                fileInput.files = files;
+                // Проверяем, соответствует ли перетаскиваемый файл ожидаемому типу
+                const isVideoContainer = fileInput.id === 'video_file';
+                const fileType = files[0].type;
                 
-                // Trigger change event
-                const event = new Event('change');
-                fileInput.dispatchEvent(event);
+                if ((isVideoContainer && fileType.startsWith('video/')) || 
+                    (!isVideoContainer && fileType.startsWith('image/'))) {
+                    fileInput.files = files;
+                    
+                    // Вызываем событие изменения
+                    const event = new Event('change');
+                    fileInput.dispatchEvent(event);
+                } else {
+                    alert(isVideoContainer ? 
+                        'Пожалуйста, перетащите сюда видеофайл. Для миниатюр используйте раздел миниатюр ниже.' : 
+                        'Пожалуйста, перетащите сюда изображение. Для видео используйте раздел видео выше.');
+                }
             }
         }
     });
+    
+    // Кнопка закрытия сообщения об успехе
+    const closeSuccessBtn = document.querySelector('.close-success-btn');
+    if (closeSuccessBtn) {
+        closeSuccessBtn.addEventListener('click', function() {
+            hideModal();
+            
+            // Обновить страницу, чтобы показать новое видео
+            window.location.reload();
+        });
+    }
 });
 </script>
-{% endblock%}
+{% endblock %}
+        
