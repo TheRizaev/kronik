@@ -18,11 +18,10 @@ function initProfileImageHandling() {
     const profilePictureInput = document.getElementById('id_profile_picture');
     const profileAvatar = document.querySelector('.profile-avatar');
     const avatarPlaceholder = profileAvatar.querySelector('.avatar-placeholder');
+    const avatarImage = profileAvatar.querySelector('img');
     
-    // Если нет изображения профиля, добавляем визуальное оформление для загрузки
-    if (avatarPlaceholder || (!profileAvatar.querySelector('img') && !document.querySelector('.avatar-upload-interface'))) {
-        createAvatarUploadInterface();
-    }
+    // Добавляем визуальное оформление для загрузки даже если есть изображение
+    createAvatarUploadInterface();
     
     // Обработчик изменения изображения
     if (profilePictureInput) {
@@ -46,6 +45,12 @@ function initProfileImageHandling() {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     updateAvatarPreview(e.target.result);
+                    
+                    // Показываем кнопку подтверждения
+                    const saveBtn = document.querySelector('.avatar-save-btn');
+                    const selectBtn = document.querySelector('.avatar-select-btn');
+                    if (saveBtn) saveBtn.style.display = 'block';
+                    if (selectBtn) selectBtn.style.display = 'none';
                 };
                 reader.readAsDataURL(file);
             }
@@ -53,22 +58,25 @@ function initProfileImageHandling() {
     }
     
     function createAvatarUploadInterface() {
+        // Если интерфейс уже существует, не создаем его снова
+        if (document.querySelector('.avatar-upload-interface')) {
+            return;
+        }
+        
         // Создаем интерфейс для загрузки аватара
         const uploadInterface = document.createElement('div');
         uploadInterface.className = 'avatar-upload-interface';
         
-        // Добавляем иконку загрузки и текст если нет аватара
-        if (avatarPlaceholder) {
-            uploadInterface.innerHTML = `
-                <div class="avatar-upload-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 5V19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M5 12H19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </div>
-                <div class="avatar-upload-text">Загрузить фото</div>
-            `;
-        }
+        // Добавляем иконку загрузки и текст
+        uploadInterface.innerHTML = `
+            <div class="avatar-upload-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 5V19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M5 12H19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div class="avatar-upload-text">Загрузить фото</div>
+        `;
         
         // Добавляем интерфейс к аватару
         profileAvatar.appendChild(uploadInterface);
@@ -183,15 +191,26 @@ function initProfileImageHandling() {
                 transition: all 0.3s;
                 font-size: 14px;
             }
-            
-            .avatar-save-btn {
+
+            .avatar-select-btn {
                 background-color: var(--accent-color);
                 color: white;
                 border: none;
             }
             
-            .avatar-save-btn:hover {
+            .avatar-select-btn:hover {
                 background-color: #7d1e46;
+                transform: translateY(-3px);
+            }
+
+            .avatar-save-btn {
+                background-color: #00a013;
+                color: white;
+                border: none;
+            }
+            
+            .avatar-save-btn:hover {
+                background-color: #00d419;
                 transform: translateY(-3px);
             }
             
@@ -235,111 +254,151 @@ function initProfileImageHandling() {
         `;
         document.head.appendChild(style);
         
-        // Добавляем контейнер для превью аватара
-        const previewContainer = document.createElement('div');
-        previewContainer.className = 'avatar-preview-container';
-        previewContainer.innerHTML = `
-            <div class="avatar-preview-content">
-                <div class="avatar-close">&times;</div>
-                <h3>Загрузка фото профиля</h3>
-                <div class="avatar-preview">
-                    <img src="${avatarPlaceholder ? '/static/default.png' : profileAvatar.querySelector('img')?.src || '/static/default.png'}" alt="Предпросмотр">
+        // Добавляем контейнер для превью аватара, если его еще нет
+        if (!document.querySelector('.avatar-preview-container')) {
+            const previewContainer = document.createElement('div');
+            previewContainer.className = 'avatar-preview-container';
+            
+            // Определим изображение для предпросмотра 
+            let previewImgSrc = '/static/default.png';
+            if (avatarImage) {
+                previewImgSrc = avatarImage.src;
+            }
+            
+            previewContainer.innerHTML = `
+                <div class="avatar-preview-content">
+                    <div class="avatar-close">&times;</div>
+                    <h3>Загрузка фото профиля</h3>
+                    <div class="avatar-preview">
+                        <img src="${previewImgSrc}" alt="Предпросмотр">
+                    </div>
+                    <div class="avatar-actions">
+                        <label for="id_profile_picture" class="avatar-action-btn avatar-select-btn">Выбрать фото</label>
+                        <button class="avatar-action-btn avatar-save-btn" style="display: none;">Подтвердить</button>
+                        <button class="avatar-action-btn avatar-cancel-btn">Отмена</button>
+                        <button class="avatar-action-btn avatar-remove-btn">Удалить фото</button>
+                    </div>
+                    <div class="error-message"></div>
                 </div>
-                <div class="avatar-actions">
-                    <label for="id_profile_picture" class="avatar-action-btn avatar-save-btn">Выбрать фото</label>
-                    <button class="avatar-action-btn avatar-cancel-btn">Отмена</button>
-                    <button class="avatar-action-btn avatar-remove-btn">Удалить фото</button>
-                </div>
-                <div class="error-message"></div>
-            </div>
-        `;
-        document.body.appendChild(previewContainer);
-        
-        // Привязываем обработчики событий
-        profileAvatar.addEventListener('click', function() {
-            previewContainer.classList.add('active');
-        });
-        
-        previewContainer.querySelector('.avatar-close').addEventListener('click', function() {
-            previewContainer.classList.remove('active');
-        });
-        
-        previewContainer.querySelector('.avatar-cancel-btn').addEventListener('click', function() {
-            previewContainer.classList.remove('active');
-        });
-        
-        // Обработчик для удаления фото
-        previewContainer.querySelector('.avatar-remove-btn').addEventListener('click', function() {
-            // Скрываем имеющееся изображение и показываем placeholder
-            if (profileAvatar.querySelector('img')) {
-                profileAvatar.querySelector('img').remove();
-                
-                // Создаем placeholder если его нет
-                if (!profileAvatar.querySelector('.avatar-placeholder')) {
-                    const placeholder = document.createElement('div');
-                    placeholder.className = 'avatar-placeholder';
+            `;
+            document.body.appendChild(previewContainer);
+            
+            // Привязываем обработчики событий
+            profileAvatar.addEventListener('click', function() {
+                previewContainer.classList.add('active');
+            });
+            
+            previewContainer.querySelector('.avatar-close').addEventListener('click', function() {
+                previewContainer.classList.remove('active');
+                resetAvatarButtons();
+            });
+            
+            previewContainer.querySelector('.avatar-cancel-btn').addEventListener('click', function() {
+                previewContainer.classList.remove('active');
+                resetAvatarButtons();
+            });
+            
+            // Обработчик для кнопки подтверждения
+            const saveBtn = previewContainer.querySelector('.avatar-save-btn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function() {
+                    // Автоматически подтверждаем и отправляем форму
+                    const settingsForm = document.querySelector('.profile-form');
+                    if (settingsForm) {
+                        // Создаем и показываем сообщение о сохранении
+                        const saveMsg = document.createElement('div');
+                        saveMsg.className = 'save-notification';
+                        saveMsg.textContent = 'Сохранение изменений...';
+                        saveMsg.style.position = 'fixed';
+                        saveMsg.style.top = '20px';
+                        saveMsg.style.right = '20px';
+                        saveMsg.style.padding = '10px 20px';
+                        saveMsg.style.backgroundColor = 'rgba(159, 37, 88, 0.9)';
+                        saveMsg.style.color = 'white';
+                        saveMsg.style.borderRadius = '5px';
+                        saveMsg.style.zIndex = '9999';
+                        document.body.appendChild(saveMsg);
+                        
+                        // Отправляем форму
+                        settingsForm.submit();
+                    } else {
+                        // Если мы на странице просмотра профиля, а не настроек
+                        const avatarForm = document.getElementById('avatar-form');
+                        if (avatarForm) {
+                            avatarForm.submit();
+                        }
+                    }
                     
-                    // Получаем первую букву имени пользователя
-                    const displayName = document.querySelector('.profile-info h2').textContent.trim();
-                    placeholder.textContent = displayName[0] || 'U';
+                    // Закрываем превью
+                    previewContainer.classList.remove('active');
+                });
+            }
+            
+            // Обработчик для удаления фото
+            previewContainer.querySelector('.avatar-remove-btn').addEventListener('click', function() {
+                // Обновляем превью до дефолтного изображения
+                const previewImg = previewContainer.querySelector('.avatar-preview img');
+                previewImg.src = '/static/default.png';
+                
+                // Очищаем input файла
+                if (profilePictureInput) {
+                    profilePictureInput.value = '';
                     
-                    profileAvatar.appendChild(placeholder);
+                    // Создаем скрытое поле для указания, что аватар нужно удалить
+                    let removeAvatarInput = document.querySelector('input[name="remove_avatar"]');
+                    if (!removeAvatarInput) {
+                        removeAvatarInput = document.createElement('input');
+                        removeAvatarInput.type = 'hidden';
+                        removeAvatarInput.name = 'remove_avatar';
+                        removeAvatarInput.value = 'true';
+                        profilePictureInput.parentNode.appendChild(removeAvatarInput);
+                    }
                 }
-            }
-            
-            // Очищаем input файла
-            if (profilePictureInput) {
-                profilePictureInput.value = '';
                 
-                // Создаем скрытое поле для указания, что аватар нужно удалить
-                let removeAvatarInput = document.querySelector('input[name="remove_avatar"]');
-                if (!removeAvatarInput) {
-                    removeAvatarInput = document.createElement('input');
-                    removeAvatarInput.type = 'hidden';
-                    removeAvatarInput.name = 'remove_avatar';
-                    removeAvatarInput.value = 'true';
-                    profilePictureInput.parentNode.appendChild(removeAvatarInput);
+                // Закрываем превью
+                previewContainer.classList.remove('active');
+                
+                // При нахождении на странице настроек, можно автоматически сохранить изменения
+                const settingsForm = document.querySelector('.profile-form');
+                if (settingsForm && window.location.href.includes('/settings/')) {
+                    // Создаем и показываем сообщение о сохранении
+                    const saveMsg = document.createElement('div');
+                    saveMsg.className = 'save-notification';
+                    saveMsg.textContent = 'Сохранение изменений...';
+                    saveMsg.style.position = 'fixed';
+                    saveMsg.style.top = '20px';
+                    saveMsg.style.right = '20px';
+                    saveMsg.style.padding = '10px 20px';
+                    saveMsg.style.backgroundColor = 'rgba(159, 37, 88, 0.9)';
+                    saveMsg.style.color = 'white';
+                    saveMsg.style.borderRadius = '5px';
+                    saveMsg.style.zIndex = '9999';
+                    document.body.appendChild(saveMsg);
+                    
+                    // Отправляем форму
+                    settingsForm.submit();
+                } else {
+                    // Если мы на странице просмотра профиля, а не настроек
+                    const avatarForm = document.getElementById('avatar-form');
+                    if (avatarForm) {
+                        avatarForm.submit();
+                    }
                 }
-            }
-            
-            // Обновляем превью
-            const previewImg = previewContainer.querySelector('.avatar-preview img');
-            previewImg.src = '/static/default.png';
-            
-            // Закрываем превью
-            previewContainer.classList.remove('active');
-            
-            // При нахождении на странице настроек, можно автоматически сохранить изменения
-            const settingsForm = document.querySelector('.profile-form');
-            if (settingsForm && window.location.href.includes('/settings/')) {
-                // Создаем и показываем сообщение о сохранении
-                const saveMsg = document.createElement('div');
-                saveMsg.className = 'save-notification';
-                saveMsg.textContent = 'Сохранение изменений...';
-                saveMsg.style.position = 'fixed';
-                saveMsg.style.top = '20px';
-                saveMsg.style.right = '20px';
-                saveMsg.style.padding = '10px 20px';
-                saveMsg.style.backgroundColor = 'rgba(159, 37, 88, 0.9)';
-                saveMsg.style.color = 'white';
-                saveMsg.style.borderRadius = '5px';
-                saveMsg.style.zIndex = '9999';
-                document.body.appendChild(saveMsg);
                 
-                // Отправляем форму
-                settingsForm.submit();
-            }
-        });
-        
-        // Предотвращаем закрытие по клику на контент
-        previewContainer.querySelector('.avatar-preview-content').addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
-        
-        // Закрытие при клике на фон
-        previewContainer.addEventListener('click', function() {
-            previewContainer.classList.remove('active');
-        });
+                // Сбрасываем кнопки
+                resetAvatarButtons();
+            });
+            
+            // Предотвращаем закрытие по клику на контент
+            previewContainer.querySelector('.avatar-preview-content').addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+            
+            // Закрытие при клике на фон
+            previewContainer.addEventListener('click', function() {
+                previewContainer.classList.remove('active');
+            });
+        }
     }
     
     function updateAvatarPreview(src) {
@@ -363,6 +422,14 @@ function initProfileImageHandling() {
                 removeAvatarInput.remove();
             }
         }
+    }
+    
+    function resetAvatarButtons() {
+        // Сбрасываем кнопки выбора и сохранения аватара
+        const saveBtn = document.querySelector('.avatar-save-btn');
+        const selectBtn = document.querySelector('.avatar-select-btn');
+        if (saveBtn) saveBtn.style.display = 'none';
+        if (selectBtn) selectBtn.style.display = 'block';
     }
     
     function showErrorMessage(message) {
