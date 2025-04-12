@@ -166,10 +166,8 @@ def list_videos_from_gcs(request):
         for video in videos:
             video_id = video.get('video_id')
             if video_id:
-                # URL для видео
                 video['url'] = generate_video_url(username, video_id, expiration_time=3600)
                 
-                # URL для миниатюры, если она существует
                 if 'thumbnail_path' in video:
                     video['thumbnail_url'] = generate_video_url(
                         username, 
@@ -177,6 +175,10 @@ def list_videos_from_gcs(request):
                         file_path=video['thumbnail_path'], 
                         expiration_time=3600
                     )
+                    # Добавляем логирование для отладки
+                    logger.info(f"Generated thumbnail URL for video {video_id}: {video['thumbnail_url']}")
+                else:
+                    logger.warning(f"No thumbnail path found for video {video_id}")
         
         return JsonResponse({
             'success': True,

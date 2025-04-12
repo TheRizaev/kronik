@@ -27,6 +27,55 @@ def custom_page_not_found(request, exception):
 
 def index(request):
     categories = Category.objects.all()
+    
+    # Получение видео из GCS вместо статических данных
+    try:
+        from .gcs_storage import list_user_videos, get_bucket, BUCKET_NAME
+        
+        # Получаем бакет
+        bucket = get_bucket(BUCKET_NAME)
+        if bucket:
+            # Получаем список пользователей (папок в GCS)
+            blobs = list(bucket.list_blobs(delimiter='/'))
+            prefixes = bucket.list_blobs(delimiter='/')
+            users = [prefix.replace('/', '') for prefix in list(prefixes.prefixes)]
+            
+            # Собираем видео от всех пользователей
+            all_videos = []
+            for user in users:
+                user_videos = list_user_videos(user)
+                if user_videos:
+                    all_videos.extend(user_videos)
+            
+            # Перемешиваем видео для случайного порядка
+            import random
+            random.shuffle(all_videos)
+            
+            # Добавляем URL для каждого видео
+            for video in all_videos:
+                video_id = video.get('video_id')
+                user_id = video.get('user_id')
+                if video_id and user_id:
+                    # Генерируем URL для видео
+                    from .gcs_storage import generate_video_url
+                    video['url'] = generate_video_url(user_id, video_id, expiration_time=3600)
+                    
+                    # Генерируем URL для миниатюры, если она существует
+                    if 'thumbnail_path' in video:
+                        video['thumbnail_url'] = generate_video_url(
+                            user_id, 
+                            video_id, 
+                            file_path=video['thumbnail_path'], 
+                            expiration_time=3600
+                        )
+            
+            return render(request, 'main/index.html', {
+                'categories': categories,
+                'gcs_videos': all_videos[:20]  # Ограничиваем количество видео
+            })
+    except Exception as e:
+        logger.error(f"Error fetching GCS videos: {e}")
+    
     return render(request, 'main/index.html', {'categories': categories})
 
 def video_detail(request, video_id):
