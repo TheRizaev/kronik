@@ -139,6 +139,9 @@ class UserProfileForm(forms.ModelForm):
         })
     )
     
+    # Profile picture field is still defined here for form handling but is processed differently
+    profile_picture = forms.ImageField(required=False)
+    
     class Meta:
         model = UserProfile
         fields = ['display_name', 'bio', 'profile_picture']
