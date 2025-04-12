@@ -150,12 +150,13 @@
                 <div class="studio-video-item" data-id="{{ video.video_id }}">
                     <div class="video-thumbnail">
                         {% if video.thumbnail_url %}
-                            <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}">
+                            <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" onerror="this.src='/static/placeholder.jpg'">
                         {% else %}
                             <div class="placeholder-thumbnail">🐰</div>
                         {% endif %}
                         <span class="video-duration">{{ video.duration|default:"00:00" }}</span>
                     </div>
+                    
                     <div class="video-details">
                         <h3 class="video-title">{{ video.title }}</h3>
                         <div class="video-meta">

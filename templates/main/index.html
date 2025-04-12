@@ -21,6 +21,28 @@
 </div>
 
 <div class="videos-grid" id="videos-container">
-    <!-- Видео будут добавляться сюда через JavaScript -->
+    {% if gcs_videos %}
+        {% for video in gcs_videos %}
+        <div class="video-card">
+            <div class="thumbnail">
+                {% if video.thumbnail_url %}
+                    <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}">
+                {% else %}
+                    <img src="{% static 'placeholder.jpg' %}" alt="{{ video.title }}">
+                {% endif %}
+                <div class="duration">{{ video.duration|default:"00:00" }}</div>
+            </div>
+            <div class="video-info">
+                <div class="video-title">{{ video.title }}</div>
+                <div class="channel-name">{{ video.user_id }}</div>
+                <div class="video-stats">
+                    <span>{{ video.views|default:"0" }} просмотров</span>
+                    <span>• {{ video.upload_date|slice:":10" }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+    <!-- JavaScript будет добавлять видео сюда, если gcs_videos пусто -->
 </div>
 {% endblock %}
