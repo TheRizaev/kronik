@@ -375,20 +375,28 @@ def send_verification_code(request, email):
     return verification_code
 
 def register_view(request):
+    """
+    Handle user registration process with email verification and default avatar.
+    
+    :param request: Django request object
+    :return: Rendered registration or verification page
+    """
+    # Redirect authenticated users
     if request.user.is_authenticated:
         # Check if email is verified
         if not request.user.profile.email_verified:
-            # If not verified, redirect to verification page
             return redirect('verify_email')
+        
         # Check if user details are completed
         if not request.user.profile.display_name:
             return redirect('user_details')
+        
         return redirect('index')
     
     # Check if we're in email verification phase
     if 'registration_data' in request.session:
         return redirect('verify_email')
-        
+    
     # Initial registration form
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)

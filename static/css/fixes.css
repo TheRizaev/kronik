@@ -2,8 +2,10 @@
 
 /* Убедимся, что основной контейнер страницы видео использует правильные цвета */
 .content {
-    background-color: var(--dark-bg);
-    color: var(--text-light);
+    margin-left: 240px; /* Ширина сайдбара */
+    padding: 1rem 2rem;
+    transition: margin-left 0.3s ease;
+    width: calc(100% - 240px);
 }
 
 /* Исправление для видимости блоков на странице видео */
@@ -164,4 +166,19 @@
 
 .light-theme .video-js {
     color: #000;
+}
+
+@media (max-width: 768px) {
+    .content {
+        margin-left: 0;
+        width: 100%;
+    }
+    
+    .sidebar {
+        left: -250px; /* Скрываем сайдбар за пределы экрана */
+    }
+    
+    .sidebar.show {
+        left: 0;
+    }
 }
