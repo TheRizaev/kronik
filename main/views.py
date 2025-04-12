@@ -30,22 +30,27 @@ def index(request):
     
     # Получение видео из GCS вместо статических данных
     try:
-        from .gcs_storage import list_user_videos, get_bucket, BUCKET_NAME
+        from .gcs_storage import list_user_videos, get_bucket, BUCKET_NAME, generate_video_url
         
         # Получаем бакет
         bucket = get_bucket(BUCKET_NAME)
         if bucket:
             # Получаем список пользователей (папок в GCS)
-            blobs = list(bucket.list_blobs(delimiter='/'))
-            prefixes = bucket.list_blobs(delimiter='/')
-            users = [prefix.replace('/', '') for prefix in list(prefixes.prefixes)]
+            # Используем list_blobs с delimiter для получения только директорий верхнего уровня
+            blobs = bucket.list_blobs(delimiter='/')
+            prefixes = list(blobs.prefixes)
+            users = [prefix.replace('/', '') for prefix in prefixes]
             
             # Собираем видео от всех пользователей
             all_videos = []
             for user in users:
                 user_videos = list_user_videos(user)
                 if user_videos:
-                    all_videos.extend(user_videos)
+                    for video in user_videos:
+                        # Добавляем user_id к каждому видео, если его нет
+                        if 'user_id' not in video:
+                            video['user_id'] = user
+                        all_videos.append(video)
             
             # Перемешиваем видео для случайного порядка
             import random
@@ -57,7 +62,6 @@ def index(request):
                 user_id = video.get('user_id')
                 if video_id and user_id:
                     # Генерируем URL для видео
-                    from .gcs_storage import generate_video_url
                     video['url'] = generate_video_url(user_id, video_id, expiration_time=3600)
                     
                     # Генерируем URL для миниатюры, если она существует
@@ -69,6 +73,36 @@ def index(request):
                             expiration_time=3600
                         )
             
+            # Форматируем данные для удобства отображения в шаблоне
+            for video in all_videos:
+                # Используем имя канала из метаданных или user_id, если канал отсутствует
+                if 'channel' not in video:
+                    video['channel'] = video.get('user_id', '')
+                
+                # Форматируем количество просмотров
+                views = video.get('views', 0)
+                if isinstance(views, int) or views.isdigit():
+                    views = int(views)
+                    if views >= 1000:
+                        video['views_formatted'] = f"{views // 1000}K просмотров"
+                    else:
+                        video['views_formatted'] = f"{views} просмотров"
+                else:
+                    video['views_formatted'] = "0 просмотров"
+                
+                # Форматируем дату загрузки
+                from datetime import datetime
+                upload_date = video.get('upload_date', '')
+                if upload_date:
+                    try:
+                        # Преобразуем ISO формат в объект datetime
+                        upload_datetime = datetime.fromisoformat(upload_date)
+                        # Выводим только дату
+                        video['upload_date_formatted'] = upload_datetime.strftime("%d.%m.%Y")
+                    except Exception:
+                        video['upload_date_formatted'] = upload_date[:10]  # Первые 10 символов как дата
+            
+            logger.info(f"Found {len(all_videos)} videos in GCS")
             return render(request, 'main/index.html', {
                 'categories': categories,
                 'gcs_videos': all_videos[:20]  # Ограничиваем количество видео

@@ -154,7 +154,7 @@ def upload_video_to_gcs(request):
 @login_required
 def list_videos_from_gcs(request):
     """
-    Получает список видео пользователя из GCS с улучшенной обработкой
+    Получает список видео пользователя из GCS с улучшенной обработкой и проверкой миниатюр
     """
     try:
         username = request.user.username
@@ -168,17 +168,25 @@ def list_videos_from_gcs(request):
             if video_id:
                 video['url'] = generate_video_url(username, video_id, expiration_time=3600)
                 
-                if 'thumbnail_path' in video:
-                    video['thumbnail_url'] = generate_video_url(
-                        username, 
-                        video_id, 
-                        file_path=video['thumbnail_path'], 
-                        expiration_time=3600
-                    )
-                    # Добавляем логирование для отладки
-                    logger.info(f"Generated thumbnail URL for video {video_id}: {video['thumbnail_url']}")
-                else:
-                    logger.warning(f"No thumbnail path found for video {video_id}")
+                # Более надежная проверка наличия миниатюры
+                if 'thumbnail_path' in video and video['thumbnail_path']:
+                    try:
+                        # Проверяем существование блоба миниатюры
+                        bucket = get_bucket()
+                        if bucket:
+                            thumbnail_blob = bucket.blob(video['thumbnail_path'])
+                            if thumbnail_blob.exists():
+                                video['thumbnail_url'] = generate_video_url(
+                                    username, 
+                                    video_id, 
+                                    file_path=video['thumbnail_path'], 
+                                    expiration_time=3600
+                                )
+                                logger.info(f"Generated thumbnail URL for video {video_id}: {video['thumbnail_url']}")
+                            else:
+                                logger.warning(f"Thumbnail blob does not exist for video {video_id}: {video['thumbnail_path']}")
+                    except Exception as thumb_err:
+                        logger.error(f"Error checking thumbnail for video {video_id}: {thumb_err}")
         
         return JsonResponse({
             'success': True,
@@ -236,7 +244,7 @@ def generate_video_url(user_id, video_id, file_path=None, expiration_time=3600):
 @login_required
 def studio_view(request):
     """
-    Представление для страницы студии с интеграцией GCS
+    Представление для страницы студии с исправленной обработкой миниатюр
     """
     # Проверяем, является ли пользователь автором
     if not request.user.profile.is_author:
@@ -245,11 +253,45 @@ def studio_view(request):
     
     # Получаем видео пользователя из GCS
     username = request.user.username
-    # ВАЖНО: больше не удаляем префикс @, сохраняем его для GCS
     
     try:
         # Получаем видео пользователя
         videos = list_user_videos(username)
+        
+        # Создаем URL для каждого видео и его миниатюры
+        for video in videos:
+            video_id = video.get('video_id')
+            if video_id:
+                # Генерируем URL для самого видео
+                video['url'] = generate_video_url(username, video_id, expiration_time=3600)
+                
+                # Более надежная проверка наличия миниатюры
+                if 'thumbnail_path' in video and video['thumbnail_path']:
+                    try:
+                        # Получаем доступ к бакету
+                        bucket = get_bucket()
+                        if bucket:
+                            # Проверяем существование файла миниатюры в GCS
+                            thumbnail_blob = bucket.blob(video['thumbnail_path'])
+                            
+                            if thumbnail_blob.exists():
+                                # Генерируем URL для миниатюры
+                                video['thumbnail_url'] = generate_video_url(
+                                    username, 
+                                    video_id, 
+                                    file_path=video['thumbnail_path'], 
+                                    expiration_time=3600
+                                )
+                                logger.info(f"Миниатюра найдена для видео {video_id}: {video['thumbnail_url']}")
+                            else:
+                                logger.warning(f"Миниатюра не найдена в GCS: {video['thumbnail_path']}")
+                    except Exception as e:
+                        logger.error(f"Ошибка при проверке миниатюры для видео {video_id}: {e}")
+        
+        # Debug сообщение
+        logger.info(f"Загружено {len(videos)} видео из GCS для пользователя {username}")
+        for i, v in enumerate(videos):
+            logger.info(f"Видео {i+1}: ID={v.get('video_id')}, Миниатюра={v.get('thumbnail_url', 'Отсутствует')}")
         
         # Получаем категории для формы загрузки
         categories = Category.objects.all()
@@ -260,6 +302,7 @@ def studio_view(request):
         })
     except Exception as e:
         messages.error(request, f'Ошибка при получении данных: {e}')
+        logger.error(f"Ошибка в studio_view: {e}")
         
     return render(request, 'studio/studio.html', {
         'videos': []

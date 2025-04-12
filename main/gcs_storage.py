@@ -6,10 +6,10 @@ from django.conf import settings
 import logging
 import mimetypes
 import uuid
+import ffmpeg
 
 # Set up logging
 logger = logging.getLogger(__name__)
-
 BUCKET_NAME = "kronik-portage"
 
 def find_json_file(start_dir=None, filename_part="kronik-26102005-0ec8103ffcf3.json"):
@@ -270,27 +270,55 @@ def upload_video(user_id, video_file_path, title=None, description=None):
         return None
 
 def get_video_duration(video_file_path):
-    """Извлекает длительность видео из файла или использует значение по умолчанию при ошибке"""
+    """
+    Extracts duration from video file using locally installed ffmpeg binary
+    """
     try:
-        # Пробуем использовать python-ffmpeg для получения длительности
         import subprocess
-        import re
+        import os
+        import json
+        from django.conf import settings
         
-        # Используем ffprobe для получения длительности видео
-        cmd = f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{video_file_path}"'
-        output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
+        ffmpeg_dir = os.path.join(settings.BASE_DIR, 'ffmpeg')
         
-        # Конвертируем секунды в формат MM:SS
-        seconds = float(output)
-        minutes = int(seconds // 60)
-        remaining_seconds = int(seconds % 60)
-        formatted_duration = f"{minutes:02d}:{remaining_seconds:02d}"
+        if os.name == 'nt':
+            ffprobe_path = os.path.join(ffmpeg_dir, 'bin', 'ffprobe.exe')
+        else:
+            ffprobe_path = os.path.join(ffmpeg_dir, 'bin', 'ffprobe')
+        
+        if not os.path.exists(ffprobe_path):
+            logger.error(f"ffprobe not found at {ffprobe_path}")
+            raise FileNotFoundError(f"ffprobe not found at {ffprobe_path}")
+        
+        cmd = [
+            ffprobe_path,
+            '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'json',
+            video_file_path
+        ]
+        
+        logger.info(f"Executing ffprobe: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            logger.error(f"ffprobe error: {result.stderr}")
+            raise Exception(f"ffprobe exited with code {result.returncode}: {result.stderr}")
+        
+        output_data = json.loads(result.stdout)
+        duration_seconds = float(output_data['format']['duration'])
+        
+        minutes = int(duration_seconds // 60)
+        seconds = int(duration_seconds % 60)
+        formatted_duration = f"{minutes:02d}:{seconds:02d}"
         
         logger.info(f"Extracted video duration: {formatted_duration}")
         return formatted_duration
         
     except Exception as e:
-        logger.error(f"Could not extract video duration: {e}")
+        logger.error(f"Could not extract video duration with ffmpeg: {e}")
+        
+        # Fallback to random duration
         import random
         minutes = random.randint(3, 15)
         seconds = random.randint(0, 59)
