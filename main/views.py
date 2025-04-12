@@ -797,9 +797,6 @@ def profile_settings_view(request):
                 
                 if os.path.exists(default_avatar_path):
                     profile_picture_path = default_avatar_path
-                    
-                    # Помечаем профиль, чтобы использовать аватар по умолчанию
-                    profile.profile_picture = None
             
             try:
                 # Обновляем профиль в GCS

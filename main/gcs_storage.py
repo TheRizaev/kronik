@@ -620,39 +620,57 @@ def update_user_profile_in_gcs(user_id, display_name=None, bio=None, profile_pic
             bio_blob.upload_from_string(bio, content_type='text/plain')
             user_meta["has_bio"] = True
         
-        # Загружаем фото профиля, если предоставлено
+        # Обработка изображения профиля
         is_default_image = False
-        if profile_picture_path:
-            # Проверяем, является ли это файлом default.png
-            if 'default.png' in profile_picture_path.lower():
-                is_default_image = True
-                # Проверяем, существует ли файл
-                if os.path.exists(profile_picture_path):
-                    # Получаем расширение файла
-                    file_extension = os.path.splitext(profile_picture_path)[1].lower()
-                    avatar_path = f"{user_id}/bio/default_avatar{file_extension}"
-                    
-                    # Загружаем дефолтное изображение профиля
-                    avatar_blob = bucket.blob(avatar_path)
-                    mime_type = mimetypes.guess_type(profile_picture_path)[0] or 'image/png'
-                    avatar_blob.upload_from_filename(profile_picture_path, content_type=mime_type)
-                    
-                    # Обновляем метаданные с путем к аватару
-                    user_meta["avatar_path"] = avatar_path
-                    user_meta["is_default_avatar"] = True
-            elif os.path.exists(profile_picture_path):
-                # Получаем расширение файла
+        
+        # Проверяем, нужно ли удалить аватар
+        if profile_picture_path and 'default.png' in profile_picture_path.lower():
+            is_default_image = True
+            # Если есть существующий аватар, удаляем его
+            if "avatar_path" in user_meta:
+                try:
+                    existing_avatar_blob = bucket.blob(user_meta["avatar_path"])
+                    if existing_avatar_blob.exists():
+                        existing_avatar_blob.delete()
+                        logger.info(f"Deleted existing avatar for user {user_id}")
+                except Exception as e:
+                    logger.error(f"Error deleting existing avatar: {e}")
+            
+            # Устанавливаем метаданные для дефолтного аватара
+            if os.path.exists(profile_picture_path):
                 file_extension = os.path.splitext(profile_picture_path)[1].lower()
-                avatar_path = f"{user_id}/bio/avatar{file_extension}"
+                avatar_path = f"{user_id}/bio/default_avatar{file_extension}"
                 
-                # Загружаем изображение профиля
+                # Загружаем дефолтное изображение профиля
                 avatar_blob = bucket.blob(avatar_path)
-                mime_type = mimetypes.guess_type(profile_picture_path)[0] or 'image/jpeg'
+                mime_type = mimetypes.guess_type(profile_picture_path)[0] or 'image/png'
                 avatar_blob.upload_from_filename(profile_picture_path, content_type=mime_type)
                 
                 # Обновляем метаданные с путем к аватару
                 user_meta["avatar_path"] = avatar_path
-                user_meta["is_default_avatar"] = False
+                user_meta["is_default_avatar"] = True
+        elif profile_picture_path and os.path.exists(profile_picture_path):
+            # Если загружен новый аватар, удаляем старый (если есть)
+            if "avatar_path" in user_meta:
+                try:
+                    existing_avatar_blob = bucket.blob(user_meta["avatar_path"])
+                    if existing_avatar_blob.exists():
+                        existing_avatar_blob.delete()
+                        logger.info(f"Deleted existing avatar for user {user_id}")
+                except Exception as e:
+                    logger.error(f"Error deleting existing avatar: {e}")
+            
+            # Загружаем новый аватар
+            file_extension = os.path.splitext(profile_picture_path)[1].lower()
+            avatar_path = f"{user_id}/bio/avatar{file_extension}"
+            
+            avatar_blob = bucket.blob(avatar_path)
+            mime_type = mimetypes.guess_type(profile_picture_path)[0] or 'image/jpeg'
+            avatar_blob.upload_from_filename(profile_picture_path, content_type=mime_type)
+            
+            # Обновляем метаданные с путем к аватару
+            user_meta["avatar_path"] = avatar_path
+            user_meta["is_default_avatar"] = False
         
         # Обновляем временную метку
         user_meta["last_updated"] = datetime.now().isoformat()
