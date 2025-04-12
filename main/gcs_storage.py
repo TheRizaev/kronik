@@ -119,6 +119,18 @@ def create_user_folder_structure(user_id):
         # Создаем начальные пустые файлы comments.json и метаданные пользователя
         init_user_files(user_id, bucket)
         
+        # Upload default avatar
+        default_avatar_path = os.path.join(settings.STATIC_ROOT, 'default.png')
+        if not os.path.exists(default_avatar_path):
+            default_avatar_path = os.path.join(settings.BASE_DIR, 'static', 'default.png')
+        
+        if os.path.exists(default_avatar_path):
+            avatar_blob_path = f"{user_id}/bio/default_avatar.png"
+            avatar_blob = bucket.blob(avatar_blob_path)
+            mime_type = mimetypes.guess_type(default_avatar_path)[0] or 'image/png'
+            avatar_blob.upload_from_filename(default_avatar_path, content_type=mime_type)
+            logger.info(f"Default avatar uploaded for user {user_id}")
+        
         logger.info(f"Successfully created folder structure for user {user_id}")
         return True
     except Exception as e:
@@ -133,7 +145,8 @@ def init_user_files(user_id, bucket):
             "user_id": user_id,
             "created_at": datetime.now().isoformat(),
             "display_name": "",
-            "avatar_path": "",
+            "avatar_path": f"{user_id}/bio/default_avatar.png",  # Set default avatar path
+            "is_default_avatar": True,
             "stats": {
                 "videos_count": 0,
                 "total_views": 0
@@ -173,7 +186,20 @@ def upload_video(user_id, video_file_path, title=None, description=None):
         return None
     
     # Создаем структуру папок, если она еще не существует
-    create_user_folder_structure(user_id)
+    # Вместо полного создания структуры, просто проверим наличие
+    # папок, чтобы не перезаписать метаданные пользователя
+    try:
+        folder_types = ["videos", "previews", "metadata", "comments"]
+        
+        for folder_type in folder_types:
+            folder_path = f"{user_id}/{folder_type}/"
+            marker_blob = bucket.blob(f"{folder_path}.keep")
+            if not marker_blob.exists():
+                marker_blob.upload_from_string('')
+                logger.info(f"Created missing folder {folder_path}")
+    except Exception as e:
+        logger.error(f"Error checking/creating folders for video upload: {e}")
+        # Continue anyway as we'll check individual paths
     
     # Генерируем ID видео на основе даты и имени файла
     now = datetime.now()
@@ -197,6 +223,9 @@ def upload_video(user_id, video_file_path, title=None, description=None):
         file_size = os.path.getsize(video_file_path)
         mime_type = mimetypes.guess_type(video_file_path)[0] or 'video/mp4'
         
+        # Извлекаем длительность видео если возможно
+        duration = get_video_duration(video_file_path)
+        
         # Загружаем видео
         video_blob = bucket.blob(video_path)
         video_blob.upload_from_filename(video_file_path, content_type=mime_type)
@@ -214,7 +243,7 @@ def upload_video(user_id, video_file_path, title=None, description=None):
             "views": 0,
             "likes": 0,
             "dislikes": 0,
-            "duration": "00:00",  # Это будет обновлено с реальной продолжительностью, если доступно
+            "duration": duration,  # Используем извлеченную длительность
             "status": "published"
         }
         
@@ -239,6 +268,30 @@ def upload_video(user_id, video_file_path, title=None, description=None):
     except Exception as e:
         logger.error(f"Error uploading video: {e}")
         return None
+
+def get_video_duration(video_file_path):
+    """Извлекает длительность видео из файла"""
+    try:
+        # Пробуем использовать python-ffmpeg для получения длительности
+        import subprocess
+        import re
+        
+        # Используем ffprobe для получения длительности видео
+        cmd = f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{video_file_path}"'
+        output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
+        
+        # Конвертируем секунды в формат MM:SS
+        seconds = float(output)
+        minutes = int(seconds // 60)
+        remaining_seconds = int(seconds % 60)
+        formatted_duration = f"{minutes:02d}:{remaining_seconds:02d}"
+        
+        logger.info(f"Extracted video duration: {formatted_duration}")
+        return formatted_duration
+        
+    except Exception as e:
+        logger.error(f"Could not extract video duration: {e}")
+        return "00:00"
 
 def update_user_stats(user_id, bucket=None):
     """Обновляет статистику пользователя в метаданных"""
@@ -276,7 +329,8 @@ def update_user_stats(user_id, bucket=None):
         user_meta["stats"]["total_views"] = total_views
         user_meta["last_updated"] = datetime.now().isoformat()
         
-        # Сохраняем обновленные метаданные
+        # Сохраняем обновленные метаданные, но сохраняем существующий аватар
+        # Это важно для предотвращения потери аватара при загрузке видео
         user_meta_blob.upload_from_string(json.dumps(user_meta, indent=2), content_type='application/json')
         return True
         
@@ -627,7 +681,7 @@ def update_user_profile_in_gcs(user_id, display_name=None, bio=None, profile_pic
         if profile_picture_path and 'default.png' in profile_picture_path.lower():
             is_default_image = True
             # Если есть существующий аватар, удаляем его
-            if "avatar_path" in user_meta:
+            if "avatar_path" in user_meta and not user_meta.get("is_default_avatar", False):
                 try:
                     existing_avatar_blob = bucket.blob(user_meta["avatar_path"])
                     if existing_avatar_blob.exists():
@@ -717,7 +771,7 @@ def get_user_profile_from_gcs(user_id):
             if avatar_blob.exists():
                 user_meta["avatar_url"] = avatar_blob.generate_signed_url(
                     version="v4",
-                    expiration=3600*24,  # 24 часа
+                    expiration=3600*24,
                     method="GET"
                 )
         

@@ -23,7 +23,8 @@ from .gcs_storage import (
     generate_video_url,
     delete_video,
     get_bucket,
-    BUCKET_NAME
+    BUCKET_NAME,
+    get_user_profile_from_gcs  # Import this to check current profile before updating
 )
 
 @login_required
