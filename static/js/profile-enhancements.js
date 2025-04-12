@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Функциональность для страницы профиля
-    if (document.querySelector('.profile-avatar')) {
+    // Check if we're on the profile settings page
+    const isProfileSettingsPage = window.location.href.includes('/profile/settings/');
+    
+    // Only initialize profile image handling on the settings page
+    if (document.querySelector('.profile-avatar') && isProfileSettingsPage) {
         initProfileImageHandling();
     }
     

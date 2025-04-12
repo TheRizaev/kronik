@@ -18,7 +18,7 @@
                     {% endif %}
                 </div>
             {% endif %}
-            <!-- Avatar upload interface will be added by JavaScript -->
+            <!-- Removed avatar upload interface, it should only appear on the settings page -->
         </div>
         <div class="profile-info">
             <h2>{{ user.profile.display_name|default:user.username }}</h2>
@@ -32,6 +32,8 @@
                 <p>Total views: {{ gcs_profile.stats.total_views|default:"0" }}</p>
             </div>
             {% endif %}
+            
+            <a href="{% url 'profile_settings' %}" class="btn btn-secondary">Edit Profile</a>
         </div>
     </div>
     
@@ -44,6 +46,16 @@
     {% endif %}
     
     <div class="profile-content">
+        <!-- Bio section -->
+        {% if gcs_profile.bio %}
+        <div class="profile-section">
+            <h3>About</h3>
+            <div class="profile-bio">
+                {{ gcs_profile.bio|linebreaks }}
+            </div>
+        </div>
+        {% endif %}
+        
         {% if user.profile.is_author %}
         <div class="profile-section">
             <h3>Author Statistics</h3>
@@ -99,14 +111,32 @@
     </div>
 </div>
 
-<!-- Hidden form for avatar updates -->
-<form id="avatar-form" method="POST" enctype="multipart/form-data" class="profile-form" style="display: none;">
-    {% csrf_token %}
-    {{ form.bio }}
-    {{ form.display_name }}
-    {{ form.profile_picture }}
-</form>
-
-<!-- Include the profile-enhancements.js script -->
+<!-- Still include profile-enhancements.js for other profile functionality, but we'll modify it -->
 <script src="{% static 'js/profile-enhancements.js' %}"></script>
+<script>
+    // Override the initProfileImageHandling function to do nothing on the profile page
+    document.addEventListener('DOMContentLoaded', function() {
+        // Replace the original function with an empty one
+        window.initProfileImageHandling = function() {
+            // Do nothing - avatar editing is disabled on the profile page
+        };
+    });
+</script>
+
+<style>
+/* Additional style for the bio section */
+.profile-bio {
+    line-height: 1.6;
+    color: inherit;
+    white-space: pre-line;
+}
+
+.dark-theme .profile-bio {
+    color: var(--text-light);
+}
+
+.light-theme .profile-bio {
+    color: var(--text-dark);
+}
+</style>
 {% endblock %}
