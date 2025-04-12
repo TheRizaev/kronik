@@ -150,7 +150,7 @@
                 <div class="studio-video-item" data-id="{{ video.video_id }}">
                     <div class="video-thumbnail">
                         {% if video.thumbnail_url %}
-                            <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" onerror="this.src='/static/placeholder.jpg'">
+                            <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" onerror="this.onerror=null; this.src='/static/placeholder.jpg';">
                         {% else %}
                             <div class="placeholder-thumbnail">🐰</div>
                         {% endif %}
@@ -167,7 +167,7 @@
                         </div>
                     </div>
                     <div class="video-actions">
-                        <a href="/video/{{ video.video_id }}" class="action-btn view-btn" target="_blank">👁️ Смотреть</a>
+                        <a href="#" class="action-btn view-btn" data-url="{{ video.url }}" target="_blank">👁️ Смотреть</a>
                         <button class="action-btn edit-btn" data-id="{{ video.video_id }}">✏️ Редактировать</button>
                         <button class="action-btn stats-btn" data-id="{{ video.video_id }}">📊 Статистика</button>
                         <button class="action-btn delete-btn" data-id="{{ video.video_id }}">🗑️ Удалить</button>
@@ -717,6 +717,35 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.reload();
         });
     }
+
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const videoUrl = this.getAttribute('data-url');
+            if (videoUrl) {
+                // Open in new tab
+                window.open(videoUrl, '_blank');
+            } else {
+                // If URL is not available, try to get it
+                const videoId = this.closest('.studio-video-item').getAttribute('data-id');
+                if (videoId) {
+                    fetch(`/api/get-video-url/${videoId}/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.url) {
+                            window.open(data.url, '_blank');
+                        } else {
+                            alert('Не удалось получить URL видео');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Ошибка при получении URL видео');
+                    });
+                }
+            }
+        });
+    });
 });
 </script>
 {% endblock %}

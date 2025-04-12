@@ -26,7 +26,7 @@
         <div class="video-card">
             <div class="thumbnail">
                 {% if video.thumbnail_url %}
-                    <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}">
+                    <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" onerror="this.src='{% static 'placeholder.jpg' %}'">
                 {% else %}
                     <img src="{% static 'placeholder.jpg' %}" alt="{{ video.title }}">
                 {% endif %}
@@ -43,6 +43,10 @@
         </div>
         {% endfor %}
     {% endif %}
-    <!-- JavaScript будет добавлять видео сюда, если gcs_videos пусто -->
+</div>
+
+<!-- Loading spinner -->
+<div id="loading-spinner" class="loading-spinner" style="display: none;">
+    <div class="spinner"></div>
 </div>
 {% endblock %}

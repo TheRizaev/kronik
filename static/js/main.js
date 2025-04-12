@@ -1,189 +1,5 @@
-// Данные видео для подгрузки
-const videoData = [
-    {
-        id: 1,
-        title: "Основы машинного обучения: Введение в нейронные сети",
-        channel: "ИИ Академия",
-        views: "245K просмотров",
-        age: "1 неделя назад",
-        duration: "28:45",
-        preview: "1.jpg"
-    },
-    {
-        id: 2,
-        title: "Интегральное исчисление: Основные методы и примеры",
-        channel: "Математический канал",
-        views: "189K просмотров",
-        age: "2 недели назад",
-        duration: "42:18",
-        preview: "2.jpg"
-    },
-    {
-        id: 3,
-        title: "Python для анализа данных: Pandas и NumPy",
-        channel: "Python Практикум",
-        views: "423K просмотров",
-        age: "3 дня назад",
-        duration: "35:12",
-        preview: "3.jpg"
-    },
-    {
-        id: 4,
-        title: "Квантовая физика: Принцип неопределенности Гейзенберга",
-        channel: "Физика для всех",
-        views: "156K просмотров",
-        age: "1 день назад",
-        duration: "45:23",
-        preview: "4.jpg"
-    },
-    {
-        id: 5,
-        title: "Основы генетики: От Менделя до современности",
-        channel: "Биология и генетика",
-        views: "112K просмотров",
-        age: "5 дней назад",
-        duration: "32:49",
-        preview: "5.jpg"
-    },
-    {
-        id: 6,
-        title: "История Древнего Рима: От республики к империи",
-        channel: "Исторический лекторий",
-        views: "174K просмотров",
-        age: "2 дня назад",
-        duration: "38:17",
-        preview: "6.jpg"
-    },
-    {
-        id: 7,
-        title: "Микро- и макроэкономика: Основные концепции и модели",
-        channel: "Экономика для всех",
-        views: "145K просмотров",
-        age: "4 дня назад",
-        duration: "26:35",
-        preview: "7.jpg"
-    },
-    {
-        id: 8,
-        title: "Основы органической химии: Функциональные группы",
-        channel: "Химия и жизнь",
-        views: "132K просмотров",
-        age: "6 дней назад",
-        duration: "41:52",
-        preview: "8.jpg"
-    },
-    {
-        id: 9,
-        title: "JavaScript продвинутый уровень: Асинхронное программирование",
-        channel: "WebDev Мастер",
-        views: "210К просмотров",
-        age: "2 дня назад",
-        duration: "47:21",
-        preview: "9.jpg"
-    },
-    {
-        id: 10,
-        title: "Астрономия: Черные дыры и их свойства",
-        channel: "Космос и наука",
-        views: "328К просмотров",
-        age: "5 дней назад",
-        duration: "34:17",
-        preview: "10.jpg"
-    },
-    {
-        id: 11,
-        title: "Линейная алгебра: Векторные пространства",
-        channel: "Математический канал",
-        views: "167K просмотров",
-        age: "3 дня назад",
-        duration: "39:45",
-        preview: "11.jpg"
-    },
-    {
-        id: 12,
-        title: "React и Redux: Управление состоянием приложения",
-        channel: "Frontend разработка",
-        views: "198K просмотров",
-        age: "1 неделя назад",
-        duration: "53:28",
-        preview: "12.jpg"
-    },
-    {
-        id: 13,
-        title: "Биохимия: Метаболические пути в клетке",
-        channel: "Биомед",
-        views: "98K просмотров",
-        age: "4 дня назад",
-        duration: "46:39",
-        preview: "13.jpg"
-    },
-    {
-        id: 14,
-        title: "Дифференциальные уравнения: Практическое применение",
-        channel: "Инженерные науки",
-        views: "147K просмотров",
-        age: "2 недели назад",
-        duration: "57:12",
-        preview: "14.jpg"
-    },
-    {
-        id: 15,
-        title: "Искусственный интеллект: Глубокое обучение",
-        channel: "ИИ Академия",
-        views: "287K просмотров",
-        age: "3 дня назад",
-        duration: "41:05",
-        preview: "15.jpg"
-    },
-    {
-        id: 16,
-        title: "SQL для начинающих: Работа с базами данных",
-        channel: "Программирование с нуля",
-        views: "201K просмотров",
-        age: "1 неделя назад",
-        duration: "32:56",
-        preview: "16.jpg"
-    },
-    {
-        id: 17,
-        title: "Античная философия: От Сократа до Аристотеля",
-        channel: "Философские беседы",
-        views: "114K просмотров",
-        age: "5 дней назад",
-        duration: "48:34",
-        preview: "17.jpg"
-    },
-    {
-        id: 18,
-        title: "Теория вероятностей: Основные концепции",
-        channel: "Статистика и анализ",
-        views: "132K просмотров",
-        age: "6 дней назад",
-        duration: "37:18",
-        preview: "18.jpg"
-    },
-    {
-        id: 19,
-        title: "Анатомия человека: Нервная система",
-        channel: "Медицинский портал",
-        views: "178K просмотров",
-        age: "4 дня назад",
-        duration: "44:10",
-        preview: "19.jpg"
-    },
-    {
-        id: 20,
-        title: "HTML и CSS: Создание адаптивных веб-страниц",
-        channel: "WebDev Мастер",
-        views: "224K просмотров",
-        age: "2 недели назад",
-        duration: "36:45",
-        preview: "20.jpg"
-    }
-];
-
-// Делаем данные видео доступными глобально для использования на странице видео
-window.videoData = videoData;
+// Переменные для хранения реальных данных видео из GCS
+let videoData = [];
 
 // Функция для создания карточки видео
 function createVideoCard(videoData, delay = 0) {
@@ -193,25 +9,26 @@ function createVideoCard(videoData, delay = 0) {
     
     // Добавляем обработчик клика, который перенаправляет на страницу видео
     card.onclick = function() {
-        window.location.href = `/video/${videoData.id}/`;
+        // Используем video_id из GCS
+        window.location.href = `/video/${videoData.video_id}/`;
     };
 
     // Определяем путь к превью, с запасным вариантом
-    const previewPath = videoData.preview ? 
-        `/static/previews/${videoData.preview}` : 
+    const previewPath = videoData.thumbnail_url ? 
+        videoData.thumbnail_url : 
         `/static/placeholder.jpg`;
 
     card.innerHTML = `
         <div class="thumbnail">
             <img src="${previewPath}" onerror="this.src='/static/placeholder.jpg'" alt="${videoData.title}">
-            <div class="duration">${videoData.duration}</div>
+            <div class="duration">${videoData.duration || "00:00"}</div>
         </div>
         <div class="video-info">
             <div class="video-title">${videoData.title}</div>
-            <div class="channel-name">${videoData.channel}</div>
+            <div class="channel-name">${videoData.user_id || ""}</div>
             <div class="video-stats">
-                <span>${videoData.views}</span>
-                <span>• ${videoData.age}</span>
+                <span>${videoData.views || "0"} просмотров</span>
+                <span>• ${videoData.upload_date ? videoData.upload_date.slice(0, 10) : "Недавно"}</span>
             </div>
         </div>
     `;
@@ -225,16 +42,47 @@ const videosPerPage = 15;
 let loadingSpinner, videosContainer;
 let isLoading = false;
 
-// Загрузка первой партии видео
-function loadInitialVideos() {
-    videosContainer = document.getElementById('videos-container');
-    if (!videosContainer) return;
-    
-    for (let i = 0; i < videosPerPage && i < videoData.length; i++) {
-        const card = createVideoCard(videoData[i], i * 100);
-        videosContainer.appendChild(card);
-        currentIndex++;
-    }
+// Загрузка видео из GCS
+function loadVideosFromGCS() {
+    // Получаем API URL для списка видео
+    fetch('/api/list-videos/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.videos) {
+                // Сохраняем полученные видео
+                videoData = data.videos;
+                
+                // Добавляем видео в контейнер
+                if (videosContainer) {
+                    // Очищаем существующие видео (если есть)
+                    videosContainer.innerHTML = '';
+                    
+                    // Добавляем новые видео
+                    for (let i = 0; i < Math.min(videosPerPage, videoData.length); i++) {
+                        const card = createVideoCard(videoData[i], i * 100);
+                        videosContainer.appendChild(card);
+                        currentIndex++;
+                    }
+                    
+                    // Если нет видео, показываем сообщение
+                    if (videoData.length === 0) {
+                        const emptyState = document.createElement('div');
+                        emptyState.className = 'empty-state';
+                        emptyState.innerHTML = `
+                            <div style="text-align: center; padding: 40px 20px;">
+                                <div style="font-size: 48px; margin-bottom: 20px;">🐰</div>
+                                <h3>Пока нет видео</h3>
+                                <p>Видео появятся здесь, когда авторы начнут их загружать</p>
+                            </div>
+                        `;
+                        videosContainer.appendChild(emptyState);
+                    }
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при получении видео из GCS:', error);
+        });
 }
 
 // Загрузка дополнительных видео
@@ -245,7 +93,7 @@ function loadMoreVideos() {
     isLoading = true;
     if (loadingSpinner) loadingSpinner.style.display = 'flex';
     
-    // Имитация загрузки
+    // Имитация загрузки для плавности
     setTimeout(() => {
         const limit = Math.min(currentIndex + videosPerPage, videoData.length);
         
@@ -257,16 +105,15 @@ function loadMoreVideos() {
         currentIndex = limit;
         isLoading = false;
         if (loadingSpinner) loadingSpinner.style.display = 'none';
-    }, 1000);
+    }, 500);
 }
 
 // Обработчик прокрутки для бесконечной загрузки
 function handleScroll() {
-    videosContainer = document.getElementById('videos-container');
     if (!videosContainer) return;
     
     // Проверяем, достиг ли пользователь конца текущих видео
-    const lastVideoCard = videosContainer.lastElementChild;
+    const lastVideoCard = videosContainer.querySelector('.video-card:last-child');
     
     if (lastVideoCard) {
         const lastVideoRect = lastVideoCard.getBoundingClientRect();
@@ -279,12 +126,12 @@ function handleScroll() {
 
 // Функция для поиска видео
 function searchVideos(query) {
-    if (!query.trim()) return [];
+    if (!query.trim() || !videoData.length) return [];
     
     query = query.toLowerCase();
     return videoData.filter(video => 
-        video.title.toLowerCase().includes(query) || 
-        video.channel.toLowerCase().includes(query)
+        (video.title && video.title.toLowerCase().includes(query)) || 
+        (video.user_id && video.user_id.toLowerCase().includes(query))
     );
 }
 
@@ -304,8 +151,8 @@ function showSearchResults(results, searchDropdown) {
     
     displayResults.forEach(video => {
         // Определяем путь к превью, с запасным вариантом
-        const previewPath = video.preview ? 
-            `/static/previews/${video.preview}` : 
+        const previewPath = video.thumbnail_url ? 
+            video.thumbnail_url : 
             `/static/placeholder.jpg`;
             
         const resultItem = document.createElement('div');
@@ -316,12 +163,12 @@ function showSearchResults(results, searchDropdown) {
             </div>
             <div class="search-info">
                 <div class="search-title">${video.title}</div>
-                <div class="search-channel">${video.channel}</div>
+                <div class="search-channel">${video.user_id || ''}</div>
             </div>
         `;
         
         resultItem.addEventListener('click', function() {
-            window.location.href = `/video/${video.id}/`;
+            window.location.href = `/video/${video.video_id}/`;
         });
         
         searchDropdown.appendChild(resultItem);
@@ -434,6 +281,18 @@ function setupThemeToggle() {
     
     if (!themeToggle || !themeTransition || !toggleText) return;
     
+    // Загружаем сохраненную тему при загрузке страницы
+    const savedTheme = localStorage.getItem('kronik-theme');
+    if (savedTheme) {
+        if (savedTheme === 'light') {
+            body.classList.remove('dark-theme');
+            body.classList.add('light-theme');
+        } else {
+            body.classList.remove('light-theme');
+            body.classList.add('dark-theme');
+        }
+    }
+    
     themeToggle.addEventListener('click', function() {
         const isDark = body.classList.contains('dark-theme');
         themeTransition.className = `theme-transition ${isDark ? 'light' : 'dark'} animating`;
@@ -441,6 +300,12 @@ function setupThemeToggle() {
         setTimeout(() => {
             body.classList.toggle('dark-theme');
             body.classList.toggle('light-theme');
+            
+            // Обновляем текст кнопки
+            const newTheme = body.classList.contains('light-theme') ? 'light' : 'dark';
+            
+            // Сохраняем выбранную тему в localStorage
+            localStorage.setItem('kronik-theme', newTheme);
         }, 500);
         
         setTimeout(() => {
@@ -494,7 +359,6 @@ function setupMobileMenu() {
 // Функция для настройки категорий
 function setupCategories() {
     const categoryChips = document.querySelectorAll('.category-chip');
-    videosContainer = document.getElementById('videos-container');
     
     if (!categoryChips.length || !videosContainer) return;
     
@@ -505,10 +369,53 @@ function setupCategories() {
             // Добавляем активный класс к выбранному элементу
             this.classList.add('active');
             
-            // Сбрасываем видео и загружаем новые
-            videosContainer.innerHTML = '';
+            // Сбрасываем индекс для правильной загрузки
             currentIndex = 0;
-            loadInitialVideos();
+            
+            // Очищаем контейнер
+            videosContainer.innerHTML = '';
+            
+            // Получаем выбранную категорию
+            const category = this.textContent.toLowerCase();
+            
+            // Если выбрана категория "Все", загружаем все видео
+            if (category === 'все') {
+                // Загружаем первую партию видео
+                for (let i = 0; i < Math.min(videosPerPage, videoData.length); i++) {
+                    const card = createVideoCard(videoData[i], i * 100);
+                    videosContainer.appendChild(card);
+                    currentIndex++;
+                }
+            } else {
+                // Фильтруем видео по категории
+                const filteredVideos = videoData.filter(video => {
+                    // Проверяем категорию видео (если она есть)
+                    if (video.category) {
+                        return video.category.toLowerCase().includes(category);
+                    }
+                    return false;
+                });
+                
+                // Если нет видео в этой категории
+                if (filteredVideos.length === 0) {
+                    const emptyState = document.createElement('div');
+                    emptyState.className = 'empty-state';
+                    emptyState.innerHTML = `
+                        <div style="text-align: center; padding: 40px 20px;">
+                            <div style="font-size: 48px; margin-bottom: 20px;">🐰</div>
+                            <h3>Нет видео в категории "${this.textContent}"</h3>
+                            <p>Попробуйте выбрать другую категорию или загляните позже</p>
+                        </div>
+                    `;
+                    videosContainer.appendChild(emptyState);
+                } else {
+                    // Добавляем отфильтрованные видео
+                    for (let i = 0; i < Math.min(videosPerPage, filteredVideos.length); i++) {
+                        const card = createVideoCard(filteredVideos[i], i * 100);
+                        videosContainer.appendChild(card);
+                    }
+                }
+            }
         });
     });
 }
@@ -519,8 +426,10 @@ document.addEventListener('DOMContentLoaded', function() {
     loadingSpinner = document.getElementById('loading-spinner');
     videosContainer = document.getElementById('videos-container');
     
-    // Инициализация загрузки видео на главной странице
-    loadInitialVideos();
+    // Загружаем реальные видео из GCS
+    if (videosContainer && videosContainer.children.length === 0) {
+        loadVideosFromGCS();
+    }
     
     // Подписка на прокрутку для бесконечной загрузки
     window.addEventListener('scroll', handleScroll);
@@ -532,46 +441,5 @@ document.addEventListener('DOMContentLoaded', function() {
     setupUserMenu();
     setupMobileMenu();
     setupCategories();
-    setupSidebarMenuItems()
+    setupSidebarMenuItems();
 });
-
-function setupThemeToggle() {
-    const themeToggle = document.querySelector('.theme-toggle');
-    const body = document.body;
-    const themeTransition = document.querySelector('.theme-transition');
-    const toggleText = document.querySelector('.toggle-text');
-    
-    if (!themeToggle || !themeTransition || !toggleText) return;
-    
-    // Загружаем сохраненную тему при загрузке страницы
-    const savedTheme = localStorage.getItem('kronik-theme');
-    if (savedTheme) {
-        if (savedTheme === 'light') {
-            body.classList.remove('dark-theme');
-            body.classList.add('light-theme');
-        } else {
-            body.classList.remove('light-theme');
-            body.classList.add('dark-theme');
-        }
-    }
-    
-    themeToggle.addEventListener('click', function() {
-        const isDark = body.classList.contains('dark-theme');
-        themeTransition.className = `theme-transition ${isDark ? 'light' : 'dark'} animating`;
-        
-        setTimeout(() => {
-            body.classList.toggle('dark-theme');
-            body.classList.toggle('light-theme');
-            
-            // Обновляем текст кнопки
-            const newTheme = body.classList.contains('light-theme') ? 'light' : 'dark';
-            
-            // Сохраняем выбранную тему в localStorage
-            localStorage.setItem('kronik-theme', newTheme);
-        }, 500);
-        
-        setTimeout(() => {
-            themeTransition.classList.remove('animating');
-        }, 1500);
-    });
-}
