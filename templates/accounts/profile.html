@@ -9,8 +9,6 @@
         <div class="profile-avatar">
             {% if gcs_profile.avatar_url %}
                 <img src="{{ gcs_profile.avatar_url }}" alt="{{ user.profile.display_name|default:user.username }}">
-            {% elif user.profile.profile_picture %}
-                <img src="{{ user.profile.profile_picture.url }}" alt="{{ user.profile.display_name|default:user.username }}">
             {% else %}
                 <div class="avatar-placeholder">
                     {% if user.profile.display_name %}
@@ -20,7 +18,7 @@
                     {% endif %}
                 </div>
             {% endif %}
-            <!-- Интерфейс для загрузки аватара будет добавлен через JavaScript -->
+            <!-- Avatar upload interface will be added by JavaScript -->
         </div>
         <div class="profile-info">
             <h2>{{ user.profile.display_name|default:user.username }}</h2>
@@ -101,6 +99,14 @@
     </div>
 </div>
 
-<!-- Подключаем наш JavaScript для улучшенного управления аватаром -->
+<!-- Hidden form for avatar updates -->
+<form id="avatar-form" method="POST" enctype="multipart/form-data" class="profile-form" style="display: none;">
+    {% csrf_token %}
+    {{ form.bio }}
+    {{ form.display_name }}
+    {{ form.profile_picture }}
+</form>
+
+<!-- Include the profile-enhancements.js script -->
 <script src="{% static 'js/profile-enhancements.js' %}"></script>
 {% endblock %}

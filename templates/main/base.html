@@ -49,8 +49,6 @@
                     <div class="avatar">
                         {% if user_avatar_url %}
                             <img src="{{ user_avatar_url }}" alt="{{ user.profile.display_name|default:user.username }}">
-                        {% elif user.profile.profile_picture %}
-                            <img src="{{ user.profile.profile_picture.url }}" alt="{{ user.profile.display_name|default:user.username }}">
                         {% else %}
                             {{ user.profile.display_name|first|default:user.username|first }}
                         {% endif %}
@@ -60,8 +58,6 @@
                             <div class="avatar">
                                 {% if user_avatar_url %}
                                     <img src="{{ user_avatar_url }}" alt="{{ user.profile.display_name|default:user.username }}">
-                                {% elif user.profile.profile_picture %}
-                                    <img src="{{ user.profile.profile_picture.url }}" alt="{{ user.profile.display_name|default:user.username }}">
                                 {% else %}
                                     {{ user.profile.display_name|first|default:user.username|first }}
                                 {% endif %}
@@ -183,7 +179,6 @@
     </div>
     
     <script src="{% static 'js/main.js' %}"></script>
-    <script src="{% static 'js/profile-enhancements.js' %}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

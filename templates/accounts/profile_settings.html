@@ -9,8 +9,6 @@
         <div class="profile-avatar">
             {% if gcs_profile.avatar_url %}
                 <img src="{{ gcs_profile.avatar_url }}" alt="{{ user.profile.display_name|default:user.username }}">
-            {% elif user.profile.profile_picture %}
-                <img src="{{ user.profile.profile_picture.url }}" alt="{{ user.profile.display_name|default:user.username }}">
             {% else %}
                 <div class="avatar-placeholder">
                     {% if user.profile.display_name %}
@@ -20,7 +18,7 @@
                     {% endif %}
                 </div>
             {% endif %}
-            <!-- Интерфейс для загрузки аватара будет добавлен через JavaScript -->
+            <!-- Avatar upload interface will be added by JavaScript -->
         </div>
         <div class="profile-info">
             <h2>{{ user.profile.display_name|default:user.username }}</h2>
@@ -45,7 +43,7 @@
             <form method="POST" enctype="multipart/form-data" class="profile-form">
                 {% csrf_token %}
                 
-                <!-- Скрытое поле для загрузки аватарки -->
+                <!-- Hidden field for avatar upload -->
                 <div style="display:none;">
                     {{ form.profile_picture }}
                 </div>
@@ -141,143 +139,13 @@
     </div>
 </div>
 
-<!-- Подключаем JavaScript для улучшенного управления аватаром -->
+<!-- Include the profile-enhancements.js script -->
 <script src="{% static 'js/profile-enhancements.js' %}"></script>
 
-<style>
-    /* Стили для настроек аккаунта */
-    .account-settings, .privacy-settings {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .account-setting-item, .privacy-setting-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 15px;
-        background-color: rgba(159, 37, 88, 0.03);
-        border-radius: 10px;
-        transition: background-color 0.3s;
-    }
-    
-    .account-setting-item:hover, .privacy-setting-item:hover {
-        background-color: rgba(159, 37, 88, 0.08);
-    }
-    
-    .setting-info h4 {
-        margin: 0 0 5px 0;
-        color: var(--primary-color);
-    }
-    
-    .setting-info p {
-        margin: 0;
-        color: var(--gray-color);
-        font-size: 14px;
-    }
-    
-    .setting-action-btn {
-        padding: 8px 15px;
-        border-radius: 20px;
-        font-weight: bold;
-        background-color: transparent;
-        color: var(--primary-color);
-        border: 1px solid var(--primary-color);
-        cursor: pointer;
-        transition: all 0.3s;
-    }
-    
-    .setting-action-btn:hover {
-        background-color: rgba(159, 37, 88, 0.1);
-        transform: translateY(-2px);
-    }
-    
-    .delete-account-btn {
-        color: #ff4757;
-        border-color: #ff4757;
-    }
-    
-    .delete-account-btn:hover {
-        background-color: rgba(255, 71, 87, 0.1);
-    }
-    
-    .danger-zone {
-        border-left: 3px solid #ff4757;
-    }
-    
-    /* Стили для переключателей */
-    .toggle-switch {
-        position: relative;
-        display: inline-block;
-        width: 60px;
-        height: 30px;
-    }
-    
-    .toggle-input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-    
-    .toggle-label {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #ccc;
-        transition: .4s;
-        border-radius: 30px;
-    }
-    
-    .toggle-label:before {
-        position: absolute;
-        content: "";
-        height: 22px;
-        width: 22px;
-        left: 4px;
-        bottom: 4px;
-        background-color: white;
-        transition: .4s;
-        border-radius: 50%;
-    }
-    
-    .toggle-input:checked + .toggle-label {
-        background-color: var(--accent-color);
-    }
-    
-    .toggle-input:checked + .toggle-label:before {
-        transform: translateX(30px);
-    }
-    
-    /* Стили для выпадающих списков */
-    .privacy-select {
-        padding: 8px 15px;
-        border-radius: 20px;
-        background-color: rgba(255, 255, 255, 0.1);
-        color: inherit;
-        border: 1px solid var(--primary-color);
-        appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%239f2558' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 10px center;
-        background-size: 16px;
-        padding-right: 35px;
-        cursor: pointer;
-    }
-    
-    .dark-theme .privacy-select {
-        background-color: rgba(255, 255, 255, 0.05);
-        color: var(--text-light);
-    }
-</style>
-
 <script>
-    // Заглушка для демонстрации функциональности настроек
+    // Placeholder for demo functionality in settings
     document.addEventListener('DOMContentLoaded', function() {
-        // Обработчики для кнопок настроек - просто показывают сообщение
+        // Handlers for setting buttons - just show message
         const settingButtons = document.querySelectorAll('.setting-action-btn:not(.delete-account-btn)');
         settingButtons.forEach(button => {
             button.addEventListener('click', function() {
@@ -285,7 +153,7 @@
             });
         });
         
-        // Обработчик для кнопки удаления аккаунта
+        // Handler for delete account button
         const deleteAccountBtn = document.querySelector('.delete-account-btn');
         if (deleteAccountBtn) {
             deleteAccountBtn.addEventListener('click', function() {
@@ -295,21 +163,21 @@
             });
         }
         
-        // Обработчик для сохранения настроек приватности
+        // Handler for saving privacy settings
         const privacySelect = document.getElementById('profile-visibility');
         const watchHistoryToggle = document.getElementById('watch-history');
         
         if (privacySelect) {
             privacySelect.addEventListener('change', function() {
-                // В реальном приложении здесь был бы AJAX запрос для сохранения настроек
-                console.log('Изменена видимость профиля:', this.value);
+                // In a real app there would be an AJAX request to save settings
+                console.log('Profile visibility changed:', this.value);
             });
         }
         
         if (watchHistoryToggle) {
             watchHistoryToggle.addEventListener('change', function() {
-                // В реальном приложении здесь был бы AJAX запрос для сохранения настроек
-                console.log('История просмотров:', this.checked ? 'включена' : 'выключена');
+                // In a real app there would be an AJAX request to save settings
+                console.log('Watch history:', this.checked ? 'enabled' : 'disabled');
             });
         }
     });
