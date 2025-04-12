@@ -13,6 +13,7 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),  # Login page
     path('logout/', views.logout_view, name='logout'),  # Logout handler
     path('profile/', views.profile_view, name='profile'),  # User profile
+    path('profile/settings/', views.profile_settings_view, name='profile_settings'),  # Profile settings
 
     path('studio/', gcs_views.studio_view, name='studio'),  # Uses the new GCS-integrated view
 

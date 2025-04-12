@@ -6,5 +6,5 @@ class MainConfig(AppConfig):
     name = 'main'
     
     def ready(self):
-        import main.signals  # Import signals module to register user profile signals
-        import main.gcs_utils  # Import GCS utils to register GCS folder creation signals
+        import main.signals
+        import main.gcs_utils

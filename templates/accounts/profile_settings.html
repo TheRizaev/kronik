@@ -1,0 +1,317 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block title %}Настройки профиля - KRONIK{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <div class="profile-avatar">
+            {% if gcs_profile.avatar_url %}
+                <img src="{{ gcs_profile.avatar_url }}" alt="{{ user.profile.display_name|default:user.username }}">
+            {% elif user.profile.profile_picture %}
+                <img src="{{ user.profile.profile_picture.url }}" alt="{{ user.profile.display_name|default:user.username }}">
+            {% else %}
+                <div class="avatar-placeholder">
+                    {% if user.profile.display_name %}
+                        {{ user.profile.display_name|first }}
+                    {% else %}
+                        {{ user.username|first }}
+                    {% endif %}
+                </div>
+            {% endif %}
+            <!-- Интерфейс для загрузки аватара будет добавлен через JavaScript -->
+        </div>
+        <div class="profile-info">
+            <h2>{{ user.profile.display_name|default:user.username }}</h2>
+            <p class="profile-username">{{ user.username }}</p>
+            <p class="profile-email">{{ user.email }}</p>
+            <p class="profile-date">Зарегистрирован: {{ user.profile.date_joined|date:"d.m.Y" }}</p>
+        </div>
+    </div>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <div class="profile-content">
+        <div class="profile-section">
+            <h3>Настройки профиля</h3>
+            
+            <form method="POST" enctype="multipart/form-data" class="profile-form">
+                {% csrf_token %}
+                
+                <!-- Скрытое поле для загрузки аватарки -->
+                <div style="display:none;">
+                    {{ form.profile_picture }}
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_display_name">Отображаемое имя</label>
+                    {{ form.display_name }}
+                    {% if form.display_name.errors %}
+                        <div class="form-error">{{ form.display_name.errors }}</div>
+                    {% endif %}
+                    <small class="form-help">Это имя будет отображаться в вашем профиле и комментариях</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_bio">О себе</label>
+                    {{ form.bio }}
+                    {% if form.bio.errors %}
+                        <div class="form-error">{{ form.bio.errors }}</div>
+                    {% endif %}
+                    <small class="form-help">Расскажите о себе, своих интересах и опыте</small>
+                </div>
+                
+                <button type="submit" class="profile-save-button">Сохранить изменения</button>
+            </form>
+        </div>
+        
+        <div class="profile-section">
+            <h3>Настройки аккаунта</h3>
+            
+            <div class="account-settings">
+                <div class="account-setting-item">
+                    <div class="setting-info">
+                        <h4>Электронная почта</h4>
+                        <p>{{ user.email }}</p>
+                    </div>
+                    <button class="setting-action-btn change-email-btn">Изменить</button>
+                </div>
+                
+                <div class="account-setting-item">
+                    <div class="setting-info">
+                        <h4>Пароль</h4>
+                        <p>●●●●●●●●</p>
+                    </div>
+                    <button class="setting-action-btn change-password-btn">Изменить</button>
+                </div>
+                
+                <div class="account-setting-item">
+                    <div class="setting-info">
+                        <h4>Настройки уведомлений</h4>
+                        <p>Управление уведомлениями по электронной почте</p>
+                    </div>
+                    <button class="setting-action-btn notification-settings-btn">Настроить</button>
+                </div>
+                
+                <div class="account-setting-item danger-zone">
+                    <div class="setting-info">
+                        <h4>Удаление аккаунта</h4>
+                        <p>Удалить свой аккаунт и все данные</p>
+                    </div>
+                    <button class="setting-action-btn delete-account-btn">Удалить аккаунт</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="profile-section">
+            <h3>Настройки приватности</h3>
+            
+            <div class="privacy-settings">
+                <div class="privacy-setting-item">
+                    <div class="setting-info">
+                        <h4>Видимость профиля</h4>
+                        <p>Кто может видеть ваш профиль</p>
+                    </div>
+                    <select class="privacy-select" id="profile-visibility">
+                        <option value="public">Все</option>
+                        <option value="registered">Только зарегистрированные пользователи</option>
+                        <option value="private">Только я</option>
+                    </select>
+                </div>
+                
+                <div class="privacy-setting-item">
+                    <div class="setting-info">
+                        <h4>История просмотров</h4>
+                        <p>Сохранять историю просмотров видео</p>
+                    </div>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="watch-history" class="toggle-input" checked>
+                        <label for="watch-history" class="toggle-label"></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Подключаем JavaScript для улучшенного управления аватаром -->
+<script src="{% static 'js/profile-enhancements.js' %}"></script>
+
+<style>
+    /* Стили для настроек аккаунта */
+    .account-settings, .privacy-settings {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .account-setting-item, .privacy-setting-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        background-color: rgba(159, 37, 88, 0.03);
+        border-radius: 10px;
+        transition: background-color 0.3s;
+    }
+    
+    .account-setting-item:hover, .privacy-setting-item:hover {
+        background-color: rgba(159, 37, 88, 0.08);
+    }
+    
+    .setting-info h4 {
+        margin: 0 0 5px 0;
+        color: var(--primary-color);
+    }
+    
+    .setting-info p {
+        margin: 0;
+        color: var(--gray-color);
+        font-size: 14px;
+    }
+    
+    .setting-action-btn {
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+        background-color: transparent;
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .setting-action-btn:hover {
+        background-color: rgba(159, 37, 88, 0.1);
+        transform: translateY(-2px);
+    }
+    
+    .delete-account-btn {
+        color: #ff4757;
+        border-color: #ff4757;
+    }
+    
+    .delete-account-btn:hover {
+        background-color: rgba(255, 71, 87, 0.1);
+    }
+    
+    .danger-zone {
+        border-left: 3px solid #ff4757;
+    }
+    
+    /* Стили для переключателей */
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 30px;
+    }
+    
+    .toggle-input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .toggle-label {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 30px;
+    }
+    
+    .toggle-label:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    
+    .toggle-input:checked + .toggle-label {
+        background-color: var(--accent-color);
+    }
+    
+    .toggle-input:checked + .toggle-label:before {
+        transform: translateX(30px);
+    }
+    
+    /* Стили для выпадающих списков */
+    .privacy-select {
+        padding: 8px 15px;
+        border-radius: 20px;
+        background-color: rgba(255, 255, 255, 0.1);
+        color: inherit;
+        border: 1px solid var(--primary-color);
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%239f2558' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        background-size: 16px;
+        padding-right: 35px;
+        cursor: pointer;
+    }
+    
+    .dark-theme .privacy-select {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: var(--text-light);
+    }
+</style>
+
+<script>
+    // Заглушка для демонстрации функциональности настроек
+    document.addEventListener('DOMContentLoaded', function() {
+        // Обработчики для кнопок настроек - просто показывают сообщение
+        const settingButtons = document.querySelectorAll('.setting-action-btn:not(.delete-account-btn)');
+        settingButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                alert('Эта функция будет доступна в ближайшем обновлении');
+            });
+        });
+        
+        // Обработчик для кнопки удаления аккаунта
+        const deleteAccountBtn = document.querySelector('.delete-account-btn');
+        if (deleteAccountBtn) {
+            deleteAccountBtn.addEventListener('click', function() {
+                if (confirm('Вы действительно хотите удалить свой аккаунт? Это действие нельзя отменить!')) {
+                    alert('Действие отменено. В реальной версии здесь будет процесс удаления аккаунта.');
+                }
+            });
+        }
+        
+        // Обработчик для сохранения настроек приватности
+        const privacySelect = document.getElementById('profile-visibility');
+        const watchHistoryToggle = document.getElementById('watch-history');
+        
+        if (privacySelect) {
+            privacySelect.addEventListener('change', function() {
+                // В реальном приложении здесь был бы AJAX запрос для сохранения настроек
+                console.log('Изменена видимость профиля:', this.value);
+            });
+        }
+        
+        if (watchHistoryToggle) {
+            watchHistoryToggle.addEventListener('change', function() {
+                // В реальном приложении здесь был бы AJAX запрос для сохранения настроек
+                console.log('История просмотров:', this.checked ? 'включена' : 'выключена');
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -575,6 +575,10 @@ def logout_view(request):
 
 @login_required
 def profile_view(request):
+    """
+    Представление профиля пользователя с улучшенной обработкой аватарок.
+    Теперь устанавливает изображение по умолчанию, если нет загруженного.
+    """
     # Проверяем, подтвержден ли email
     if not request.user.profile.email_verified:
         # Если не подтвержден, перенаправляем на страницу подтверждения
@@ -592,7 +596,10 @@ def profile_view(request):
             # Получаем имя пользователя для хранения в GCS (с префиксом @)
             username = request.user.username
             
-            # Обрабатываем фото профиля, если предоставлено
+            # Проверяем, нужно ли удалить текущую аватарку
+            remove_avatar = request.POST.get('remove_avatar') == 'true'
+            
+            # Обрабатываем фото профиля, если предоставлено или требуется удаление
             profile_picture_path = None
             if request.FILES.get('profile_picture'):
                 # Создаем временный файл
@@ -609,6 +616,11 @@ def profile_view(request):
                 with open(profile_picture_path, 'wb+') as destination:
                     for chunk in profile_pic.chunks():
                         destination.write(chunk)
+            elif remove_avatar:
+                # Если нужно удалить аватарку и установить дефолтную
+                default_avatar_path = os.path.join(settings.STATIC_ROOT, 'default.png')
+                if os.path.exists(default_avatar_path):
+                    profile_picture_path = default_avatar_path
             
             try:
                 # Обновляем профиль в GCS
@@ -625,7 +637,7 @@ def profile_view(request):
                     logger.warning(f"Не удалось обновить профиль в GCS для пользователя {username}")
                 
                 # Очищаем временный файл, если он был создан
-                if profile_picture_path and os.path.exists(profile_picture_path):
+                if profile_picture_path and os.path.exists(profile_picture_path) and profile_picture_path != os.path.join(settings.STATIC_ROOT, 'default.png'):
                     os.remove(profile_picture_path)
                     
             except Exception as e:
@@ -633,7 +645,7 @@ def profile_view(request):
                 # Продолжаем сохранение профиля в базе данных, даже если обновление GCS не удалось
                 
                 # Очищаем временный файл, если он был создан
-                if profile_picture_path and os.path.exists(profile_picture_path):
+                if profile_picture_path and os.path.exists(profile_picture_path) and profile_picture_path != os.path.join(settings.STATIC_ROOT, 'default.png'):
                     os.remove(profile_picture_path)
             
             # Сохраняем профиль в базе данных
@@ -726,3 +738,130 @@ def author_application(request):
         form = AuthorApplicationForm(instance=request.user.profile)
     
     return render(request, 'accounts/author_application.html', {'form': form})
+
+@login_required
+def profile_settings_view(request):
+    """
+    Представление для страницы настроек профиля с возможностью изменения аватара.
+    """
+    # Проверяем, подтвержден ли email
+    if not request.user.profile.email_verified:
+        # Если не подтвержден, перенаправляем на страницу подтверждения
+        return redirect('verify_email')
+    
+    # Проверяем, заполнены ли данные пользователя
+    if not request.user.profile.display_name:
+        return redirect('user_details')
+        
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, request.FILES, instance=request.user.profile)
+        if form.is_valid():
+            profile = form.save(commit=False)
+            
+            # Получаем имя пользователя для хранения в GCS (с префиксом @)
+            username = request.user.username
+            
+            # Проверяем, нужно ли удалить текущую аватарку
+            remove_avatar = request.POST.get('remove_avatar') == 'true'
+            
+            # Обрабатываем фото профиля, если предоставлено или требуется удаление
+            profile_picture_path = None
+            if request.FILES.get('profile_picture'):
+                # Создаем временный файл
+                temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
+                os.makedirs(temp_dir, exist_ok=True)
+                
+                # Получаем расширение файла
+                profile_pic = request.FILES['profile_picture']
+                file_name = profile_pic.name
+                file_extension = os.path.splitext(file_name)[1].lower()
+                
+                # Сохраняем загруженный файл временно
+                profile_picture_path = os.path.join(temp_dir, f"{uuid.uuid4()}{file_extension}")
+                with open(profile_picture_path, 'wb+') as destination:
+                    for chunk in profile_pic.chunks():
+                        destination.write(chunk)
+            elif remove_avatar:
+                # Если нужно удалить аватарку и установить дефолтную
+                default_avatar_path = os.path.join(settings.STATIC_ROOT, 'default.png')
+                if not os.path.exists(default_avatar_path):
+                    default_avatar_path = os.path.join(settings.BASE_DIR, 'static', 'default.png')
+                
+                if os.path.exists(default_avatar_path):
+                    profile_picture_path = default_avatar_path
+                    
+                    # Помечаем профиль, чтобы использовать аватар по умолчанию
+                    profile.profile_picture = None
+            
+            try:
+                # Обновляем профиль в GCS
+                from .gcs_storage import update_user_profile_in_gcs
+                
+                gcs_result = update_user_profile_in_gcs(
+                    user_id=username,
+                    display_name=profile.display_name,
+                    bio=profile.bio,
+                    profile_picture_path=profile_picture_path
+                )
+                
+                if not gcs_result:
+                    logger.warning(f"Не удалось обновить профиль в GCS для пользователя {username}")
+                
+                # Очищаем временный файл, если он был создан
+                if profile_picture_path and os.path.exists(profile_picture_path) and profile_picture_path != os.path.join(settings.STATIC_ROOT, 'default.png') and profile_picture_path != os.path.join(settings.BASE_DIR, 'static', 'default.png'):
+                    os.remove(profile_picture_path)
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении профиля в GCS: {e}")
+                # Продолжаем сохранение профиля в базе данных, даже если обновление GCS не удалось
+                
+                # Очищаем временный файл, если он был создан
+                if profile_picture_path and os.path.exists(profile_picture_path) and profile_picture_path != os.path.join(settings.STATIC_ROOT, 'default.png') and profile_picture_path != os.path.join(settings.BASE_DIR, 'static', 'default.png'):
+                    os.remove(profile_picture_path)
+            
+            # Сохраняем профиль в базе данных
+            profile.save()
+            messages.success(request, 'Настройки профиля успешно обновлены!')
+            return redirect('profile_settings')
+    else:
+        form = UserProfileForm(instance=request.user.profile)
+        
+        # Пытаемся загрузить информацию профиля из GCS для отображения
+        try:
+            username = request.user.username
+            
+            from .gcs_storage import get_user_profile_from_gcs
+            gcs_profile = get_user_profile_from_gcs(username)
+            
+            # Передаем данные профиля GCS в контекст шаблона, если они доступны
+            if gcs_profile:
+                return render(request, 'accounts/profile_settings.html', {
+                    'form': form,
+                    'gcs_profile': gcs_profile
+                })
+        except Exception as e:
+            logger.error(f"Ошибка при получении профиля GCS: {e}")
+    
+    return render(request, 'accounts/profile_settings.html', {'form': form})
+
+@login_required
+def base_context_processor(request):
+    """
+    Обработчик контекста для добавления информации профиля для base.html
+    Регистрируется в settings.py в TEMPLATES['OPTIONS']['context_processors']
+    """
+    context = {}
+    
+    if request.user.is_authenticated:
+        try:
+            # Получаем профиль из GCS для доступа к URL аватара
+            from .gcs_storage import get_user_profile_from_gcs
+            gcs_profile = get_user_profile_from_gcs(request.user.username)
+            
+            if gcs_profile and 'avatar_url' in gcs_profile:
+                context['user_avatar_url'] = gcs_profile['avatar_url']
+        except Exception as e:
+            # Если возникла ошибка, логируем, но не нарушаем работу страницы
+            logger.error(f"Error loading user profile for context: {e}")
+    
+    return context

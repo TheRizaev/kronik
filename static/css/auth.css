@@ -239,34 +239,6 @@
     object-fit: cover;
 }
 
-/* Кроличьи ушки для аватара профиля */
-.profile-avatar::before,
-.profile-avatar::after {
-    content: "";
-    position: absolute;
-    background-color: var(--accent-color);
-    width: 25px;
-    height: 40px;
-    top: -30px;
-    border-radius: 50% 50% 0 0;
-}
-
-.profile-avatar::before {
-    left: 30px;
-    transform: rotate(-15deg);
-}
-
-.profile-avatar::after {
-    right: 30px;
-    transform: rotate(15deg);
-}
-
-.avatar-placeholder {
-    font-size: 60px;
-    font-weight: bold;
-    color: white;
-}
-
 .profile-info h2 {
     margin: 0 0 15px 0;
     font-size: 28px;

@@ -40,36 +40,6 @@
     box-shadow: 0 10px 25px rgba(159, 37, 88, 0.3);
 }
 
-/* Кроличьи ушки для карточек видео */
-.video-card::before,
-.video-card::after {
-    content: "";
-    position: absolute;
-    background-color: var(--accent-color);
-    width: 15px;
-    height: 25px;
-    top: -15px;
-    border-radius: 50% 50% 0 0;
-    z-index: 1;
-    transition: height 0.3s;
-    opacity: 0;
-}
-
-.video-card:hover::before,
-.video-card:hover::after {
-    opacity: 1;
-}
-
-.video-card::before {
-    left: 30%;
-    transform: rotate(-15deg);
-}
-
-.video-card::after {
-    right: 30%;
-    transform: rotate(15deg);
-}
-
 .thumbnail {
     width: 100%;
     height: 160px;

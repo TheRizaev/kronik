@@ -101,32 +101,6 @@ body.dark-theme {
     50% { transform: scale(1.05); }
 }
 
-/* Специальный класс для кроличьих ушек */
-.bunny-ears {
-    position: relative;
-}
-
-.bunny-ears::before,
-.bunny-ears::after {
-    content: "";
-    position: absolute;
-    background-color: var(--accent-color);
-    width: 14px;
-    height: 25px;
-    top: -18px;
-    border-radius: 50% 50% 0 0;
-}
-
-.bunny-ears::before {
-    left: 30%;
-    transform: rotate(-15deg);
-}
-
-.bunny-ears::after {
-    right: 30%;
-    transform: rotate(15deg);
-}
-
 /* Дополнительные кроличьи элементы */
 .bunny-icon {
     font-size: 1.2em;

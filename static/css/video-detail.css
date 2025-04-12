@@ -202,28 +202,6 @@
     position: relative;
 }
 
-/* Кроличьи ушки для аватара канала */
-.channel-avatar::before,
-.channel-avatar::after {
-    content: "";
-    position: absolute;
-    background-color: var(--accent-color);
-    width: 14px;
-    height: 25px;
-    top: -18px;
-    border-radius: 50% 50% 0 0;
-}
-
-.channel-avatar::before {
-    left: 12px;
-    transform: rotate(-15deg);
-}
-
-.channel-avatar::after {
-    right: 12px;
-    transform: rotate(15deg);
-}
-
 .channel-details {
     flex-grow: 1;
 }
@@ -311,28 +289,6 @@
     color: white;
     flex-shrink: 0;
     position: relative;
-}
-
-/* Кроличьи ушки для аватара пользователя */
-.user-avatar::before,
-.user-avatar::after {
-    content: "";
-    position: absolute;
-    background-color: var(--accent-color);
-    width: 12px;
-    height: 20px;
-    top: -15px;
-    border-radius: 50% 50% 0 0;
-}
-
-.user-avatar::before {
-    left: 10px;
-    transform: rotate(-15deg);
-}
-
-.user-avatar::after {
-    right: 10px;
-    transform: rotate(15deg);
 }
 
 .comment-form input {
