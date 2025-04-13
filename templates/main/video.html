@@ -9,7 +9,7 @@
     <div class="video-content">
         <div class="video-container">
             <div class="video-wrapper">
-                <video id="video-player" poster="{% if video.thumbnail_url %}{{ video.thumbnail_url }}{% else %}{% static 'placeholder.jpg' %}{% endif %}">
+                <video id="video-player" poster="{% if video.thumbnail_url %}{{ video.thumbnail_url }}{% else %}{% static 'placeholder.jpg' %}{% endif %}" preload="auto">
                     <source src="{{ video.video_url|default:'#' }}" type="video/mp4">
                     Ваш браузер не поддерживает видео HTML5.
                 </video>
@@ -149,9 +149,9 @@
             </div>
             
             <div class="channel-info">
-                <div class="channel-avatar">{{ video.channel|first }}</div>
+                <div class="channel-avatar">{{ video.display_name|default:video.channel|first }}</div>
                 <div class="channel-details">
-                    <div class="channel-name">{{ video.channel }}</div>
+                    <div class="channel-name">{{ video.display_name|default:video.channel }}</div>
                     <div class="subscribers">{{ video.subscribers|default:"0" }} подписчиков</div>
                 </div>
                 <button class="subscribe-button">Подписаться</button>
@@ -234,7 +234,7 @@
                     </div>
                     <div class="related-info">
                         <div class="related-title">{{ video.title }}</div>
-                        <div class="related-channel">{{ video.channel }}</div>
+                        <div class="related-channel">{{ video.display_name|default:video.channel }}</div>
                         <div class="related-stats">{{ video.views_formatted }}</div>
                     </div>
                 </div>
@@ -278,11 +278,36 @@
     const videoContainer = document.querySelector('.video-container');
     const videoTitle = document.querySelector('.video-title');
     
+    // Оптимизация загрузки видео
+    if (videoPlayer) {
+        // Устанавливаем приоритет загрузки (только метаданные, затем контент)
+        videoPlayer.preload = 'metadata';
+        
+        // Уменьшаем время для начала воспроизведения
+        videoPlayer.addEventListener('loadedmetadata', function() {
+            // Предварительно буферизуем первые несколько секунд
+            if (videoPlayer.buffered.length === 0 || videoPlayer.buffered.end(0) < 5) {
+                videoPlayer.currentTime = 0.1; // Немного перематываем для начала буферизации
+                setTimeout(() => {
+                    // Возвращаемся к началу после буферизации
+                    videoPlayer.currentTime = 0;
+                    // Скрываем спиннер загрузки
+                    loadingSpinner.classList.remove('visible');
+                }, 500);
+            } else {
+                loadingSpinner.classList.remove('visible');
+            }
+            
+            // Задаем длительность видео
+            durationDisplay.textContent = formatTime(videoPlayer.duration);
+        });
+    }
+    
     // Симуляция загрузки видео
     loadingSpinner.classList.add('visible');
     setTimeout(() => {
         loadingSpinner.classList.remove('visible');
-    }, 2000);
+    }, 1000); // Уменьшил время отображения спиннера
     
     // Обработчики событий для видео
     videoPlayer.addEventListener('loadedmetadata', function() {

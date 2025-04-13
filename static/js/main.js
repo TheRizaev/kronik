@@ -53,16 +53,32 @@ function loadVideosFromGCS() {
     isLoading = true;
     if (loadingSpinner) loadingSpinner.style.display = 'flex';
     
+    console.log("Loading videos from all users...");
+    
+    // Для отладки: проверим, что переменные определены
+    if (!videosContainer) {
+        console.error("videosContainer is not defined");
+        return;
+    }
+    
     // Получаем API URL для списка видео
-    fetch('/api/list-videos/')
-        .then(response => response.json())
+    fetch('/api/list-all-videos/')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             isLoading = false;
             if (loadingSpinner) loadingSpinner.style.display = 'none';
             
-            if (data.success && data.videos) {
+            console.log("API response:", data);
+            
+            if (data.success && data.videos && data.videos.length > 0) {
                 // Сохраняем полученные видео
                 videoData = data.videos;
+                console.log(`Received ${videoData.length} videos`);
                 
                 // Перемешиваем видео для случайного порядка
                 shuffleArray(videoData);
@@ -78,20 +94,22 @@ function loadVideosFromGCS() {
                         videosContainer.appendChild(card);
                         currentIndex++;
                     }
-                    
-                    // Если нет видео, показываем сообщение
-                    if (videoData.length === 0) {
-                        const emptyState = document.createElement('div');
-                        emptyState.className = 'empty-state';
-                        emptyState.innerHTML = `
-                            <div style="text-align: center; padding: 40px 20px;">
-                                <div style="font-size: 48px; margin-bottom: 20px;">🐰</div>
-                                <h3>Пока нет видео</h3>
-                                <p>Видео появятся здесь, когда авторы начнут их загружать</p>
-                            </div>
-                        `;
-                        videosContainer.appendChild(emptyState);
-                    }
+                }
+            } else {
+                console.log("No videos found or invalid data structure");
+                
+                // Показываем сообщение, если нет видео
+                if (videosContainer) {
+                    const emptyState = document.createElement('div');
+                    emptyState.className = 'empty-state';
+                    emptyState.innerHTML = `
+                        <div style="text-align: center; padding: 40px 20px;">
+                            <div style="font-size: 48px; margin-bottom: 20px;">🐰</div>
+                            <h3>Пока нет видео</h3>
+                            <p>Видео появятся здесь, когда авторы начнут их загружать</p>
+                        </div>
+                    `;
+                    videosContainer.appendChild(emptyState);
                 }
             }
         })
@@ -99,6 +117,18 @@ function loadVideosFromGCS() {
             isLoading = false;
             if (loadingSpinner) loadingSpinner.style.display = 'none';
             console.error('Ошибка при получении видео из GCS:', error);
+            
+            // Показываем сообщение об ошибке
+            if (videosContainer) {
+                videosContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px 20px;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+                        <h3>Произошла ошибка при загрузке видео</h3>
+                        <p>Пожалуйста, обновите страницу или попробуйте позже</p>
+                        <p style="color: #999; font-size: 0.8rem;">Ошибка: ${error.message}</p>
+                    </div>
+                `;
+            }
         });
 }
 
