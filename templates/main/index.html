@@ -23,21 +23,21 @@
 <div class="videos-grid" id="videos-container">
     {% if gcs_videos %}
         {% for video in gcs_videos %}
-        <div class="video-card">
+        <div class="video-card" onclick="window.location.href='/video/{{ video.user_id }}__{{ video.video_id }}/'">
             <div class="thumbnail">
                 {% if video.thumbnail_url %}
-                    <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" onerror="this.src='{% static 'placeholder.jpg' %}'">
+                    <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" loading="lazy" onerror="this.src='{% static 'placeholder.jpg' %}'">
                 {% else %}
-                    <img src="{% static 'placeholder.jpg' %}" alt="{{ video.title }}">
+                    <img src="{% static 'placeholder.jpg' %}" alt="{{ video.title }}" loading="lazy">
                 {% endif %}
                 <div class="duration">{{ video.duration|default:"00:00" }}</div>
             </div>
             <div class="video-info">
                 <div class="video-title">{{ video.title }}</div>
-                <div class="channel-name">{{ video.user_id }}</div>
+                <div class="channel-name">{{ video.display_name|default:video.channel }}</div>
                 <div class="video-stats">
-                    <span>{{ video.views|default:"0" }} просмотров</span>
-                    <span>• {{ video.upload_date|slice:":10" }}</span>
+                    <span>{{ video.views_formatted|default:"0 просмотров" }}</span>
+                    <span>• {{ video.upload_date_formatted|default:"Недавно" }}</span>
                 </div>
             </div>
         </div>

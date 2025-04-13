@@ -4,17 +4,13 @@
 
 {% block title %}{{ video.title }} - KRONIK{% endblock %}
 
-{% block extra_head %}
-<!-- Подключаем CSS для плеера -->
-{% endblock %}
-
 {% block content %}
 <div class="video-page-layout">
     <div class="video-content">
         <div class="video-container">
             <div class="video-wrapper">
-                <video id="video-player" poster="{% if video.thumbnail %}{{ video.thumbnail.url }}{% else %}{% static 'placeholder.jpg' %}{% endif %}">
-                    <source src="{{ video.video_file.url|default:'#' }}" type="video/mp4">
+                <video id="video-player" poster="{% if video.thumbnail_url %}{{ video.thumbnail_url }}{% else %}{% static 'placeholder.jpg' %}{% endif %}">
+                    <source src="{{ video.video_url|default:'#' }}" type="video/mp4">
                     Ваш браузер не поддерживает видео HTML5.
                 </video>
                 
@@ -143,10 +139,10 @@
         <div class="video-details">
             <h1>{{ video.title }}</h1>
             <div class="video-info-bar">
-                <div class="views-info">{{ video.views }} • {{ video.age }}</div>
+                <div class="views-info">{{ video.views_formatted }} • {{ video.upload_date_formatted|default:video.age }}</div>
                 <div class="actions-bar">
-                    <button class="action-button" id="likeButton">👍 <span id="likeCount">0</span></button>
-                    <button class="action-button" id="dislikeButton">👎 <span id="dislikeCount">0</span></button>
+                    <button class="action-button" id="likeButton">👍 <span id="likeCount">{{ video.likes|default:"0" }}</span></button>
+                    <button class="action-button" id="dislikeButton">👎 <span id="dislikeCount">{{ video.dislikes|default:"0" }}</span></button>
                     <button class="action-button">↗️ Поделиться</button>
                     <button class="action-button">💾 Сохранить</button>
                 </div>
@@ -156,7 +152,7 @@
                 <div class="channel-avatar">{{ video.channel|first }}</div>
                 <div class="channel-details">
                     <div class="channel-name">{{ video.channel }}</div>
-                    <div class="subscribers">10K подписчиков</div>
+                    <div class="subscribers">{{ video.subscribers|default:"0" }} подписчиков</div>
                 </div>
                 <button class="subscribe-button">Подписаться</button>
             </div>
@@ -177,26 +173,26 @@
                 {% if comments %}
                     {% for comment in comments %}
                     <div class="comment">
-                        <div class="comment-avatar">{{ comment.user.username|first }}</div>
+                        <div class="comment-avatar">{{ comment.display_name|first }}</div>
                         <div class="comment-content">
-                            <div class="comment-author">{{ comment.user.username }}</div>
-                            <div class="comment-text">{{ comment.content }}</div>
-                            <div class="comment-meta">{{ comment.created_at|naturaltime }}</div>
+                            <div class="comment-author">{{ comment.display_name }}</div>
+                            <div class="comment-text">{{ comment.text }}</div>
+                            <div class="comment-meta">{{ comment.date|date:"d.m.Y" }}</div>
                             <div class="comment-actions">
                                 <button class="comment-like">👍 <span>{{ comment.likes|default:"0" }}</span></button>
                                 <button class="comment-dislike">👎</button>
                                 <button class="comment-reply">Ответить</button>
                             </div>
                             
-                            {% if comment.replies.exists %}
+                            {% if comment.replies %}
                             <div class="comment-replies">
-                                {% for reply in comment.replies.all %}
+                                {% for reply in comment.replies %}
                                 <div class="reply">
-                                    <div class="comment-avatar">{{ reply.user.username|first }}</div>
+                                    <div class="comment-avatar">{{ reply.display_name|first }}</div>
                                     <div class="comment-content">
-                                        <div class="comment-author">{{ reply.user.username }}</div>
-                                        <div class="comment-text">{{ reply.content }}</div>
-                                        <div class="comment-meta">{{ reply.created_at|naturaltime }}</div>
+                                        <div class="comment-author">{{ reply.display_name }}</div>
+                                        <div class="comment-text">{{ reply.text }}</div>
+                                        <div class="comment-meta">{{ reply.date|date:"d.m.Y" }}</div>
                                         <div class="comment-actions">
                                             <button class="comment-like">👍 <span>{{ reply.likes|default:"0" }}</span></button>
                                             <button class="comment-dislike">👎</button>
@@ -213,14 +209,9 @@
                     <div class="comment">
                         <div class="comment-avatar">К</div>
                         <div class="comment-content">
-                            <div class="comment-author">Комментатор</div>
-                            <div class="comment-text">Очень полезное видео! Спасибо за объяснение.</div>
-                            <div class="comment-meta">2 дня назад</div>
-                            <div class="comment-actions">
-                                <button class="comment-like">👍 <span>24</span></button>
-                                <button class="comment-dislike">👎</button>
-                                <button class="comment-reply">Ответить</button>
-                            </div>
+                            <div class="comment-author">KRONIK</div>
+                            <div class="comment-text">Этот ролик пока никто не комментировал. Будьте первым!</div>
+                            <div class="comment-meta">Только что</div>
                         </div>
                     </div>
                 {% endif %}
@@ -231,7 +222,26 @@
     <div class="related-videos">
         <h3>Рекомендуемые видео</h3>
         <div class="related-videos-list" id="related-videos-container">
-            <!-- Рекомендуемые видео будут добавлены с помощью JavaScript -->
+            {% if recommended_videos %}
+                {% for video in recommended_videos %}
+                <div class="related-video-card" onclick="window.location.href='{{ video.url }}'">
+                    <div class="related-thumbnail">
+                        {% if video.thumbnail_url %}
+                        <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" onerror="this.src='{% static 'placeholder.jpg' %}'">
+                        {% else %}
+                        <img src="{% static 'placeholder.jpg' %}" alt="{{ video.title }}">
+                        {% endif %}
+                    </div>
+                    <div class="related-info">
+                        <div class="related-title">{{ video.title }}</div>
+                        <div class="related-channel">{{ video.channel }}</div>
+                        <div class="related-stats">{{ video.views_formatted }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="padding: 20px; color: var(--gray-color); text-align: center;">Рекомендации загружаются...</p>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -543,6 +553,105 @@
     // Инициализация начальных состояний
     updateVolumeIcon();
     volumeLevel.style.width = `${videoPlayer.volume * 100}%`;
+    
+    // Track video views
+    let viewTracked = false;
+    videoPlayer.addEventListener('timeupdate', function() {
+        // Track view after 5 seconds of playback
+        if (!viewTracked && videoPlayer.currentTime > 5) {
+            viewTracked = true;
+            console.log('View tracked');
+            // In a real app, you would make an AJAX request to track the view
+        }
+    });
+    
+    // Add comment functionality
+    const commentInput = document.querySelector('.comment-form input');
+    if (commentInput) {
+        commentInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && this.value.trim() !== '') {
+                console.log('Comment submitted:', this.value);
+                // In a real app, you would make an AJAX request to save the comment
+                
+                // For demo, show a mock comment
+                const commentsList = document.querySelector('.comments-list');
+                if (commentsList) {
+                    // Create a new comment element
+                    const newComment = document.createElement('div');
+                    newComment.className = 'comment';
+                    newComment.innerHTML = `
+                        <div class="comment-avatar">${document.querySelector('.user-avatar').textContent}</div>
+                        <div class="comment-content">
+                            <div class="comment-author">${document.querySelector('.user-avatar').textContent}</div>
+                            <div class="comment-text">${this.value}</div>
+                            <div class="comment-meta">Только что</div>
+                            <div class="comment-actions">
+                                <button class="comment-like">👍 <span>0</span></button>
+                                <button class="comment-dislike">👎</button>
+                                <button class="comment-reply">Ответить</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // If there's the demo comment, remove it
+                    const demoComment = commentsList.querySelector('.comment-author:contains("KRONIK")');
+                    if (demoComment) {
+                        demoComment.closest('.comment').remove();
+                    }
+                    
+                    // Insert at the top of the list
+                    commentsList.insertBefore(newComment, commentsList.firstChild);
+                    
+                    // Clear the input
+                    this.value = '';
+                }
+            }
+        });
+    }
+    
+    // Like/dislike functionality
+    const likeButton = document.getElementById('likeButton');
+    const dislikeButton = document.getElementById('dislikeButton');
+    const likeCount = document.getElementById('likeCount');
+    const dislikeCount = document.getElementById('dislikeCount');
+    
+    if (likeButton && dislikeButton) {
+        likeButton.addEventListener('click', function() {
+            if (this.classList.contains('active')) {
+                // Unlike
+                this.classList.remove('active');
+                likeCount.textContent = parseInt(likeCount.textContent) - 1;
+            } else {
+                // Like
+                this.classList.add('active');
+                likeCount.textContent = parseInt(likeCount.textContent) + 1;
+                
+                // If dislike was active, remove it
+                if (dislikeButton.classList.contains('active')) {
+                    dislikeButton.classList.remove('active');
+                    dislikeCount.textContent = parseInt(dislikeCount.textContent) - 1;
+                }
+            }
+        });
+        
+        dislikeButton.addEventListener('click', function() {
+            if (this.classList.contains('active')) {
+                // Un-dislike
+                this.classList.remove('active');
+                dislikeCount.textContent = parseInt(dislikeCount.textContent) - 1;
+            } else {
+                // Dislike
+                this.classList.add('active');
+                dislikeCount.textContent = parseInt(dislikeCount.textContent) + 1;
+                
+                // If like was active, remove it
+                if (likeButton.classList.contains('active')) {
+                    likeButton.classList.remove('active');
+                    likeCount.textContent = parseInt(likeCount.textContent) - 1;
+                }
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

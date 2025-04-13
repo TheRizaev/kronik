@@ -1,22 +1,24 @@
-/* Сетка видео */
 .videos-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.8rem;
     padding: 1rem;
+    contain: layout style; /* Помогает браузеру оптимизировать рендеринг */
 }
 
 .video-card {
     cursor: pointer;
     border-radius: 15px;
     overflow: hidden;
-    transition: all 0.3s;
+    transition: transform 0.3s, box-shadow 0.3s;
     opacity: 0;
     transform: translateY(20px);
     animation: fadeIn 0.5s forwards;
     background-color: rgba(255, 255, 255, 0.7);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
     position: relative;
+    will-change: transform; /* Подсказка браузеру об анимации */
+    contain: content; /* Улучшает производительность */
 }
 
 .dark-theme .video-card {
@@ -53,6 +55,7 @@
     height: 100%;
     object-fit: cover;
     transition: transform 0.5s;
+    contain: paint; /* Улучшает производительность рендеринга изображений */
 }
 
 .video-card:hover .thumbnail img {
@@ -70,6 +73,7 @@
     border-radius: 20px;
     font-weight: bold;
     backdrop-filter: blur(5px);
+    z-index: 1;
 }
 
 .video-info {
@@ -86,6 +90,7 @@
     line-height: 1.4;
     font-size: 1.05rem;
     color: white; /* Названия видео белым цветом */
+    text-rendering: optimizeSpeed; /* Улучшает производительность */
 }
 
 .channel-name {
@@ -93,6 +98,9 @@
     color: var(--gray-color); /* Цвет канала как у статистики */
     margin-bottom: 0.3rem;
     font-weight: normal; /* Не делаем имя канала жирным */
+    text-overflow: ellipsis; /* Добавляем многоточие для длинных имен */
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .video-stats {
@@ -127,6 +135,8 @@
     padding: 0.8rem 0;
     margin-bottom: 1rem;
     scrollbar-width: thin;
+    scroll-behavior: smooth; /* Плавная прокрутка */
+    -webkit-overflow-scrolling: touch; /* Улучшает прокрутку на iOS */
 }
 
 .category-filter::-webkit-scrollbar {
@@ -153,6 +163,7 @@
     transition: all 0.3s;
     font-weight: 600;
     border: 2px solid transparent;
+    user-select: none; /* Предотвращает выделение текста */
 }
 
 .dark-theme .category-chip {
@@ -176,7 +187,7 @@
     box-shadow: 0 5px 15px rgba(159, 37, 88, 0.3);
 }
 
-/* Спиннер загрузки */
+/* Спиннер загрузки с оптимизацией */
 .loading-spinner {
     display: flex;
     justify-content: center;
@@ -184,8 +195,8 @@
     color: var(--primary-color);
     font-size: 2rem;
     animation: spin 1s infinite linear;
+    contain: strict; /* Максимальное ограничение для улучшения производительности */
 }
-
 
 @keyframes spin {
     from {
@@ -196,10 +207,11 @@
     }
 }
 
-/* Адаптивные стили */
+/* Оптимизация для мобильных устройств */
 @media (max-width: 1200px) {
     .videos-grid {
         grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        contain: content;
     }
 }
 
@@ -211,6 +223,8 @@
     
     .category-filter {
         padding: 0.5rem 0;
+        gap: 0.5rem;
+        overflow-x: auto;
     }
     
     .category-chip {
@@ -220,6 +234,11 @@
     
     .video-title {
         font-size: 0.95rem;
+        -webkit-line-clamp: 2;
+    }
+    
+    .thumbnail {
+        height: 140px; /* Уменьшаем высоту для более быстрой загрузки на мобильных */
     }
 }
 
@@ -229,6 +248,6 @@
     }
     
     .thumbnail {
-        height: 200px;
+        height: 180px;
     }
 }

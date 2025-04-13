@@ -1,7 +1,3 @@
-// Переменные для хранения реальных данных видео из GCS
-let videoData = [];
-
-// Функция для создания карточки видео
 function createVideoCard(videoData, delay = 0) {
     const card = document.createElement('div');
     card.className = 'video-card';
@@ -9,8 +5,9 @@ function createVideoCard(videoData, delay = 0) {
     
     // Добавляем обработчик клика, который перенаправляет на страницу видео
     card.onclick = function() {
-        // Используем video_id из GCS
-        window.location.href = `/video/${videoData.video_id}/`;
+        // Используем составной ID: user_id + video_id
+        const videoUrl = `/video/${videoData.user_id}__${videoData.video_id}/`;
+        window.location.href = videoUrl;
     };
 
     // Определяем путь к превью, с запасным вариантом
@@ -18,17 +15,21 @@ function createVideoCard(videoData, delay = 0) {
         videoData.thumbnail_url : 
         `/static/placeholder.jpg`;
 
+    // Определяем имя канала: предпочитаем display_name, затем channel, затем user_id
+    const channelName = videoData.display_name || videoData.channel || videoData.user_id || "";
+    
+    // Используем только изображение превью вместо видео
     card.innerHTML = `
         <div class="thumbnail">
-            <img src="${previewPath}" onerror="this.src='/static/placeholder.jpg'" alt="${videoData.title}">
+            <img src="${previewPath}" alt="${videoData.title}" loading="lazy" onerror="this.src='/static/placeholder.jpg'">
             <div class="duration">${videoData.duration || "00:00"}</div>
         </div>
         <div class="video-info">
             <div class="video-title">${videoData.title}</div>
-            <div class="channel-name">${videoData.user_id || ""}</div>
+            <div class="channel-name">${channelName}</div>
             <div class="video-stats">
-                <span>${videoData.views || "0"} просмотров</span>
-                <span>• ${videoData.upload_date ? videoData.upload_date.slice(0, 10) : "Недавно"}</span>
+                <span>${videoData.views_formatted || videoData.views || "0 просмотров"}</span>
+                <span>• ${videoData.upload_date_formatted || (videoData.upload_date ? videoData.upload_date.slice(0, 10) : "Недавно")}</span>
             </div>
         </div>
     `;
@@ -36,21 +37,35 @@ function createVideoCard(videoData, delay = 0) {
     return card;
 }
 
+// Переменные для хранения реальных данных видео из GCS
+let videoData = [];
+
 // Переменные для управления загрузкой
 let currentIndex = 0;
-const videosPerPage = 15;
+const videosPerPage = 15; // Показываем только 15 видео за раз для быстрой загрузки
 let loadingSpinner, videosContainer;
 let isLoading = false;
 
-// Загрузка видео из GCS
+// Загрузка видео из GCS с оптимизацией
 function loadVideosFromGCS() {
+    if (isLoading) return;
+    
+    isLoading = true;
+    if (loadingSpinner) loadingSpinner.style.display = 'flex';
+    
     // Получаем API URL для списка видео
     fetch('/api/list-videos/')
         .then(response => response.json())
         .then(data => {
+            isLoading = false;
+            if (loadingSpinner) loadingSpinner.style.display = 'none';
+            
             if (data.success && data.videos) {
                 // Сохраняем полученные видео
                 videoData = data.videos;
+                
+                // Перемешиваем видео для случайного порядка
+                shuffleArray(videoData);
                 
                 // Добавляем видео в контейнер
                 if (videosContainer) {
@@ -81,11 +96,22 @@ function loadVideosFromGCS() {
             }
         })
         .catch(error => {
+            isLoading = false;
+            if (loadingSpinner) loadingSpinner.style.display = 'none';
             console.error('Ошибка при получении видео из GCS:', error);
         });
 }
 
-// Загрузка дополнительных видео
+// Функция для перемешивания массива (алгоритм Фишера-Йейтса)
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// Загрузка дополнительных видео с отложенной загрузкой изображений
 function loadMoreVideos() {
     if (isLoading || currentIndex >= videoData.length) return;
     
@@ -108,20 +134,27 @@ function loadMoreVideos() {
     }, 500);
 }
 
-// Обработчик прокрутки для бесконечной загрузки
+// Оптимизированный обработчик прокрутки с дебаунсингом
+let scrollTimeout;
 function handleScroll() {
-    if (!videosContainer) return;
+    if (scrollTimeout) clearTimeout(scrollTimeout);
     
-    // Проверяем, достиг ли пользователь конца текущих видео
-    const lastVideoCard = videosContainer.querySelector('.video-card:last-child');
-    
-    if (lastVideoCard) {
-        const lastVideoRect = lastVideoCard.getBoundingClientRect();
-        // Загружаем новые видео только когда последняя карточка видео видна в области просмотра
-        if (lastVideoRect.bottom <= window.innerHeight && !isLoading) {
-            loadMoreVideos();
+    scrollTimeout = setTimeout(() => {
+        if (!videosContainer) return;
+        
+        // Проверяем, достиг ли пользователь конца текущих видео
+        const lastVideoCard = videosContainer.querySelector('.video-card:last-child');
+        
+        if (lastVideoCard) {
+            const lastVideoRect = lastVideoCard.getBoundingClientRect();
+            const offset = 200; // Загружаем немного раньше, чем пользователь достигнет конца
+            
+            // Загружаем новые видео когда последняя карточка приближается к области просмотра
+            if (lastVideoRect.bottom <= window.innerHeight + offset && !isLoading) {
+                loadMoreVideos();
+            }
         }
-    }
+    }, 100); // Дебаунсинг в 100мс для предотвращения слишком частых вызовов
 }
 
 // Функция для поиска видео
@@ -131,6 +164,8 @@ function searchVideos(query) {
     query = query.toLowerCase();
     return videoData.filter(video => 
         (video.title && video.title.toLowerCase().includes(query)) || 
+        (video.display_name && video.display_name.toLowerCase().includes(query)) ||
+        (video.channel && video.channel.toLowerCase().includes(query)) ||
         (video.user_id && video.user_id.toLowerCase().includes(query))
     );
 }
@@ -154,21 +189,24 @@ function showSearchResults(results, searchDropdown) {
         const previewPath = video.thumbnail_url ? 
             video.thumbnail_url : 
             `/static/placeholder.jpg`;
+        
+        // Определяем имя канала для отображения
+        const channelName = video.display_name || video.channel || video.user_id || '';
             
         const resultItem = document.createElement('div');
         resultItem.className = 'search-result';
         resultItem.innerHTML = `
             <div class="search-thumbnail">
-                <img src="${previewPath}" onerror="this.src='/static/placeholder.jpg'" alt="${video.title}">
+                <img src="${previewPath}" loading="lazy" onerror="this.src='/static/placeholder.jpg'" alt="${video.title}">
             </div>
             <div class="search-info">
                 <div class="search-title">${video.title}</div>
-                <div class="search-channel">${video.user_id || ''}</div>
+                <div class="search-channel">${channelName}</div>
             </div>
         `;
         
         resultItem.addEventListener('click', function() {
-            window.location.href = `/video/${video.video_id}/`;
+            window.location.href = `/video/${video.user_id}__${video.video_id}/`;
         });
         
         searchDropdown.appendChild(resultItem);
@@ -202,11 +240,24 @@ function setupSearch() {
     
     if (!searchInput || !searchDropdown) return;
     
-    // Обработчики событий для поиска
+    // Дебаунсинг для поиска при вводе
+    let searchTimeout;
     searchInput.addEventListener('input', function() {
+        if (searchTimeout) clearTimeout(searchTimeout);
+        
         const query = this.value;
-        const results = searchVideos(query);
-        showSearchResults(results, searchDropdown);
+        
+        // Если запрос пустой, скрываем результаты
+        if (!query.trim()) {
+            searchDropdown.classList.remove('show');
+            return;
+        }
+        
+        // Задержка перед поиском, чтобы не перегружать систему
+        searchTimeout = setTimeout(() => {
+            const results = searchVideos(query);
+            showSearchResults(results, searchDropdown);
+        }, 300);
     });
     
     searchInput.addEventListener('focus', function() {
@@ -375,47 +426,59 @@ function setupCategories() {
             // Очищаем контейнер
             videosContainer.innerHTML = '';
             
-            // Получаем выбранную категорию
-            const category = this.textContent.toLowerCase();
+            // Показываем спиннер загрузки
+            if (loadingSpinner) loadingSpinner.style.display = 'flex';
             
-            // Если выбрана категория "Все", загружаем все видео
-            if (category === 'все') {
-                // Загружаем первую партию видео
-                for (let i = 0; i < Math.min(videosPerPage, videoData.length); i++) {
-                    const card = createVideoCard(videoData[i], i * 100);
-                    videosContainer.appendChild(card);
-                    currentIndex++;
-                }
-            } else {
-                // Фильтруем видео по категории
-                const filteredVideos = videoData.filter(video => {
-                    // Проверяем категорию видео (если она есть)
-                    if (video.category) {
-                        return video.category.toLowerCase().includes(category);
-                    }
-                    return false;
-                });
-                
-                // Если нет видео в этой категории
-                if (filteredVideos.length === 0) {
-                    const emptyState = document.createElement('div');
-                    emptyState.className = 'empty-state';
-                    emptyState.innerHTML = `
-                        <div style="text-align: center; padding: 40px 20px;">
-                            <div style="font-size: 48px; margin-bottom: 20px;">🐰</div>
-                            <h3>Нет видео в категории "${this.textContent}"</h3>
-                            <p>Попробуйте выбрать другую категорию или загляните позже</p>
-                        </div>
-                    `;
-                    videosContainer.appendChild(emptyState);
-                } else {
-                    // Добавляем отфильтрованные видео
-                    for (let i = 0; i < Math.min(videosPerPage, filteredVideos.length); i++) {
-                        const card = createVideoCard(filteredVideos[i], i * 100);
+            // Добавляем небольшую задержку для отображения UX загрузки
+            setTimeout(() => {
+                // Если выбрана категория "Все", загружаем все видео
+                if (category === 'все') {
+                    // Перемешиваем видео заново для разнообразия
+                    shuffleArray(videoData);
+                    
+                    // Загружаем первую партию видео
+                    for (let i = 0; i < Math.min(videosPerPage, videoData.length); i++) {
+                        const card = createVideoCard(videoData[i], i * 50); // Уменьшаем задержку для быстрой загрузки
                         videosContainer.appendChild(card);
+                        currentIndex++;
+                    }
+                } else {
+                    // Фильтруем видео по категории
+                    const filteredVideos = videoData.filter(video => {
+                        // Проверяем категорию видео (если она есть)
+                        if (video.category) {
+                            return video.category.toLowerCase().includes(category);
+                        }
+                        return false;
+                    });
+                    
+                    // Перемешиваем отфильтрованные видео
+                    shuffleArray(filteredVideos);
+                    
+                    // Если нет видео в этой категории
+                    if (filteredVideos.length === 0) {
+                        const emptyState = document.createElement('div');
+                        emptyState.className = 'empty-state';
+                        emptyState.innerHTML = `
+                            <div style="text-align: center; padding: 40px 20px;">
+                                <div style="font-size: 48px; margin-bottom: 20px;">🐰</div>
+                                <h3>Нет видео в категории "${this.textContent}"</h3>
+                                <p>Попробуйте выбрать другую категорию или загляните позже</p>
+                            </div>
+                        `;
+                        videosContainer.appendChild(emptyState);
+                    } else {
+                        // Добавляем отфильтрованные видео
+                        for (let i = 0; i < Math.min(videosPerPage, filteredVideos.length); i++) {
+                            const card = createVideoCard(filteredVideos[i], i * 50);
+                            videosContainer.appendChild(card);
+                        }
                     }
                 }
-            }
+                
+                // Скрываем спиннер загрузки
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
+            }, 300);
         });
     });
 }
@@ -431,8 +494,9 @@ document.addEventListener('DOMContentLoaded', function() {
         loadVideosFromGCS();
     }
     
-    // Подписка на прокрутку для бесконечной загрузки
-    window.addEventListener('scroll', handleScroll);
+    // Подписка на прокрутку для бесконечной загрузки с использованием
+    // passive: true для увеличения производительности прокрутки
+    window.addEventListener('scroll', handleScroll, { passive: true });
     
     // Настройка всех интерактивных элементов
     setupSearch();
