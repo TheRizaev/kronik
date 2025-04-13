@@ -5,7 +5,7 @@ from django.conf import settings
 
 urlpatterns = [
     path('', views.index, name='index'),  # Main page
-    path('video/<int:video_id>/', views.video_detail, name='video_detail'),  # Video detail page
+    path('video/<str:video_id>/', views.video_detail, name='video_detail_gcs'),  # New GCS video detail page
     path('search/', views.search_results, name='search_results'),  # Search results page
     path('register/', views.register_view, name='register'),  # Registration page
     path('verify-email/', views.verify_email_view, name='verify_email'),  # Email verification page

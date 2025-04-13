@@ -30,7 +30,7 @@ def index(request):
     
     # Получение видео из GCS вместо статических данных
     try:
-        from .gcs_storage import list_user_videos, get_bucket, BUCKET_NAME, generate_video_url
+        from .gcs_storage import list_user_videos, get_bucket, BUCKET_NAME, generate_video_url, get_user_profile_from_gcs
         
         # Получаем бакет
         bucket = get_bucket(BUCKET_NAME)
@@ -43,17 +43,34 @@ def index(request):
             
             # Собираем видео от всех пользователей
             all_videos = []
+            
+            # Сохраняем профили пользователей для получения display_name
+            user_profiles = {}
+            
             for user in users:
+                # Получаем профиль пользователя для display_name
+                user_profile = get_user_profile_from_gcs(user)
+                if user_profile:
+                    # Сохраняем профиль для использования ниже
+                    user_profiles[user] = user_profile
+                
                 user_videos = list_user_videos(user)
                 if user_videos:
                     for video in user_videos:
                         # Добавляем user_id к каждому видео, если его нет
                         if 'user_id' not in video:
                             video['user_id'] = user
+                        
+                        # Добавляем display_name автора
+                        if user in user_profiles and 'display_name' in user_profiles[user]:
+                            video['display_name'] = user_profiles[user]['display_name']
+                        else:
+                            # Если display_name отсутствует, используем username без префикса @
+                            video['display_name'] = user.replace('@', '')
+                            
                         all_videos.append(video)
             
             # Перемешиваем видео для случайного порядка
-            import random
             random.shuffle(all_videos)
             
             # Добавляем URL для каждого видео
@@ -75,9 +92,9 @@ def index(request):
             
             # Форматируем данные для удобства отображения в шаблоне
             for video in all_videos:
-                # Используем имя канала из метаданных или user_id, если канал отсутствует
+                # Используем display_name из метаданных для канала
                 if 'channel' not in video:
-                    video['channel'] = video.get('user_id', '')
+                    video['channel'] = video.get('display_name', video.get('user_id', ''))
                 
                 # Форматируем количество просмотров
                 views = video.get('views', 0)
@@ -113,318 +130,287 @@ def index(request):
     return render(request, 'main/index.html', {'categories': categories})
 
 def video_detail(request, video_id):
-    # В реальном проекте вы будете искать видео по ID
-    # Для демонстрации используем статические данные
-    # Предполагаем, что video_id от 1 до 20 соответствует видеоданным из main.js
-    video_data = None
+    """
+    Показывает подробную информацию о видео из GCS.
     
-    # Пример данных для одного видео
-    if 1 <= video_id <= 20:
-        sample_titles = {
-            1: "Основы машинного обучения: Введение в нейронные сети",
-            2: "Интегральное исчисление: Основные методы и примеры",
-            3: "Python для анализа данных: Pandas и NumPy",
-            4: "Квантовая физика: Принцип неопределенности Гейзенберга",
-            5: "Основы генетики: От Менделя до современности",
-            6: "История Древнего Рима: От республики к империи",
-            7: "Микро- и макроэкономика: Основные концепции и модели",
-            8: "Основы органической химии: Функциональные группы",
-            9: "JavaScript продвинутый уровень: Асинхронное программирование",
-            10: "Астрономия: Черные дыры и их свойства",
-            11: "Линейная алгебра: Векторные пространства",
-            12: "React и Redux: Управление состоянием приложения",
-            13: "Биохимия: Метаболические пути в клетке", 
-            14: "Дифференциальные уравнения: Практическое применение",
-            15: "Искусственный интеллект: Глубокое обучение",
-            16: "SQL для начинающих: Работа с базами данных",
-            17: "Античная философия: От Сократа до Аристотеля", 
-            18: "Теория вероятностей: Основные концепции",
-            19: "Анатомия человека: Нервная система",
-            20: "HTML и CSS: Создание адаптивных веб-страниц"
-        }
+    Args:
+        request: HTTP request
+        video_id: ID видео (строка в формате gcs_video_id)
+    """
+    try:
+        # Проверяем, содержит ли video_id информацию о пользователе
+        # Формат видео ID либо как username__video_id либо просто video_id
+        if '__' in video_id:
+            # Если ID содержит разделитель, разбиваем его
+            user_id, gcs_video_id = video_id.split('__')
+        else:
+            # Если старый формат или нет пользователя, ищем в метаданных всех видео
+            gcs_video_id = video_id
+            user_id = None
+            
+            from .gcs_storage import get_bucket, BUCKET_NAME
+            bucket = get_bucket(BUCKET_NAME)
+            
+            if bucket:
+                # Получаем список пользователей
+                blobs = bucket.list_blobs(delimiter='/')
+                prefixes = list(blobs.prefixes)
+                users = [prefix.replace('/', '') for prefix in prefixes]
+                
+                # Ищем видео среди всех пользователей
+                from .gcs_storage import get_video_metadata
+                for user in users:
+                    metadata = get_video_metadata(user, gcs_video_id)
+                    if metadata:  # Если нашли видео, используем этого пользователя
+                        user_id = user
+                        break
         
-        sample_channels = {
-            1: "ИИ Академия",
-            2: "Математический канал", 
-            3: "Python Практикум",
-            4: "Физика для всех",
-            5: "Биология и генетика",
-            6: "Исторический лекторий",
-            7: "Экономика для всех", 
-            8: "Химия и жизнь",
-            9: "WebDev Мастер",
-            10: "Космос и наука",
-            11: "Математический канал",
-            12: "Frontend разработка",
-            13: "Биомед",
-            14: "Инженерные науки",
-            15: "ИИ Академия", 
-            16: "Программирование с нуля",
-            17: "Философские беседы",
-            18: "Статистика и анализ",
-            19: "Медицинский портал",
-            20: "WebDev Мастер"
-        }
+        if not user_id:
+            logger.error(f"Could not find user for video {gcs_video_id}")
+            return render(request, 'main/404.html', status=404)
+            
+        from .gcs_storage import get_video_metadata, generate_video_url, get_video_comments, get_user_profile_from_gcs
         
-        # Используем сопоставление или значение по умолчанию
-        title = sample_titles.get(video_id, f"Видео #{video_id}")
-        channel = sample_channels.get(video_id, "Канал видео")
+        # Получаем метаданные видео
+        metadata = get_video_metadata(user_id, gcs_video_id)
         
+        if not metadata:
+            logger.error(f"Could not find metadata for video {gcs_video_id} from user {user_id}")
+            return render(request, 'main/404.html', status=404)
+        
+        # Получаем профиль пользователя для display_name
+        user_profile = get_user_profile_from_gcs(user_id)
+        display_name = user_profile.get('display_name', user_id.replace('@', '')) if user_profile else user_id.replace('@', '')
+            
+        # Получаем временный URL для видео
+        video_url = generate_video_url(user_id, gcs_video_id, expiration_time=3600)
+        
+        # Получаем URL для превью, если оно есть
+        thumbnail_url = None
+        if "thumbnail_path" in metadata:
+            thumbnail_url = generate_video_url(
+                user_id, 
+                gcs_video_id, 
+                file_path=metadata["thumbnail_path"], 
+                expiration_time=3600
+            )
+        
+        # Получаем комментарии
+        comments_data = get_video_comments(user_id, gcs_video_id)
+        
+        # Подготавливаем данные для шаблона
         video_data = {
-            'id': video_id,
-            'title': title,
-            'channel': channel,
-            'views': f"{random.randint(10, 500)}K просмотров",
-            'age': f"{random.randint(1, 14)} дней назад",
-            'duration': f"{random.randint(10, 59)}:{random.randint(10, 59)}"
+            'id': f"{user_id}__{gcs_video_id}",  # Составной ID для URL
+            'gcs_id': gcs_video_id,              # Оригинальный ID в GCS
+            'user_id': user_id,                  # ID пользователя (владельца)
+            'title': metadata.get('title', 'Без названия'),
+            'description': metadata.get('description', 'Без описания'),
+            'channel': display_name,             # Используем display_name из профиля
+            'views': metadata.get('views', 0),
+            'views_formatted': f"{metadata.get('views', 0)} просмотров",
+            'likes': metadata.get('likes', 0),
+            'dislikes': metadata.get('dislikes', 0),
+            'duration': metadata.get('duration', '00:00'),
+            'video_url': video_url,
+            'thumbnail_url': thumbnail_url,
+            # Форматирование даты загрузки
+            'upload_date': metadata.get('upload_date', ''),
+            'age': metadata.get('age_text', 'Недавно')
         }
-    else:
-        # Если ID не соответствует известным видео
-        video_data = {
-            'id': video_id,
-            'title': f"Видео #{video_id}",
-            'channel': "Канал видео",
-            'views': "10K просмотров",
-            'age': "1 неделя назад",
-            'duration': "10:30"
-        }
+        
+        # Получаем рекомендуемые видео (можно использовать те же функции, что в index)
+        recommended_videos = get_recommended_videos(user_id, gcs_video_id)
+        
+        return render(request, 'main/video.html', {
+            'video': video_data,
+            'comments': comments_data.get('comments', []),
+            'recommended_videos': recommended_videos
+        })
+    except Exception as e:
+        logger.error(f"Error loading video details: {e}")
+        return render(request, 'main/404.html', status=404)
+        
+def get_recommended_videos(current_user_id, current_video_id, limit=10):
+    """
+    Получает рекомендованные видео на основе текущего видео.
+    Принцип работы: получаем все видео из GCS, исключаем текущее и перемешиваем.
     
-    return render(request, 'main/video.html', {'video': video_data})
+    Args:
+        current_user_id: ID пользователя текущего видео
+        current_video_id: ID текущего видео
+        limit: максимальное количество рекомендаций
+        
+    Returns:
+        list: Список рекомендованных видео
+    """
+    try:
+        from .gcs_storage import list_user_videos, get_bucket, BUCKET_NAME, generate_video_url, get_user_profile_from_gcs
+        
+        # Получаем бакет
+        bucket = get_bucket(BUCKET_NAME)
+        if not bucket:
+            return []
+            
+        # Получаем список пользователей
+        blobs = bucket.list_blobs(delimiter='/')
+        prefixes = list(blobs.prefixes)
+        users = [prefix.replace('/', '') for prefix in prefixes]
+        
+        # Кэш для профилей пользователей
+        user_profiles = {}
+        
+        # Собираем все видео
+        all_videos = []
+        for user_id in users:
+            # Получаем профиль пользователя для display_name
+            if user_id not in user_profiles:
+                user_profile = get_user_profile_from_gcs(user_id)
+                user_profiles[user_id] = user_profile
+            
+            user_videos = list_user_videos(user_id)
+            if user_videos:
+                for video in user_videos:
+                    # Пропускаем текущее видео
+                    if user_id == current_user_id and video.get('video_id') == current_video_id:
+                        continue
+                        
+                    # Добавляем user_id к видео
+                    if 'user_id' not in video:
+                        video['user_id'] = user_id
+                    
+                    # Добавляем display_name
+                    if user_id in user_profiles and user_profiles[user_id] and 'display_name' in user_profiles[user_id]:
+                        video['display_name'] = user_profiles[user_id]['display_name']
+                    else:
+                        # Если display_name отсутствует, используем username без префикса @
+                        video['display_name'] = user_id.replace('@', '')
+                        
+                    all_videos.append(video)
+        
+        # Перемешиваем видео
+        random.shuffle(all_videos)
+        
+        # Ограничиваем количество
+        recommended = all_videos[:limit]
+        
+        # Добавляем URL для каждого видео
+        for video in recommended:
+            video_id = video.get('video_id')
+            user_id = video.get('user_id')
+            if video_id and user_id:
+                # URL для видео
+                video['url'] = f"/video/{user_id}__{video_id}/"
+                
+                # URL для миниатюры
+                if 'thumbnail_path' in video:
+                    video['thumbnail_url'] = generate_video_url(
+                        user_id, 
+                        video_id, 
+                        file_path=video['thumbnail_path'], 
+                        expiration_time=3600
+                    )
+                
+                # Форматируем данные для шаблона
+                # Используем display_name из метаданных или user_id
+                if 'channel' not in video:
+                    video['channel'] = video.get('display_name', video.get('user_id', ''))
+                
+                # Форматируем просмотры
+                views = video.get('views', 0)
+                if isinstance(views, int) or (isinstance(views, str) and views.isdigit()):
+                    views = int(views)
+                    if views >= 1000:
+                        video['views_formatted'] = f"{views // 1000}K просмотров"
+                    else:
+                        video['views_formatted'] = f"{views} просмотров"
+                else:
+                    video['views_formatted'] = "0 просмотров"
+                    
+        return recommended
+    except Exception as e:
+        logger.error(f"Error getting recommended videos: {e}")
+        return []
 
 def search_results(request):
     query = request.GET.get('query', '')
     
-    # В реальном проекте здесь будет запрос к базе данных
-    # для поиска видео по запросу
-    videos = []
+    if not query:
+        return render(request, 'main/search.html', {'query': query, 'videos': []})
     
-    # Пример соответствий ключевых слов и видео
-    search_mappings = {
-        'машин': [1, 15],
-        'обучен': [1, 15],
-        'нейрон': [1],
-        'python': [3],
-        'pandas': [3],
-        'numpy': [3],
-        'матем': [2, 11, 14, 18],
-        'интеграл': [2],
-        'алгебр': [11],
-        'физик': [4],
-        'квант': [4],
-        'биолог': [5, 13],
-        'генетик': [5],
-        'истор': [6, 17],
-        'рим': [6],
-        'эконом': [7],
-        'хими': [8, 13],
-        'javascript': [9],
-        'js': [9],
-        'программирован': [3, 9, 12, 16],
-        'астроном': [10],
-        'космос': [10],
-        'react': [12],
-        'redux': [12],
-        'уравнен': [14],
-        'искусственн': [1, 15],
-        'sql': [16],
-        'баз данных': [16],
-        'философ': [17],
-        'вероятност': [18],
-        'статистик': [18],
-        'анатом': [19],
-        'нерв': [19],
-        'html': [20],
-        'css': [20],
-        'веб': [9, 12, 20]
-    }
-    
-    # Список соответствий видео из main.js
-    video_list = [
-        {
-            'id': 1,
-            'title': "Основы машинного обучения: Введение в нейронные сети",
-            'channel': "ИИ Академия",
-            'views': "245K просмотров",
-            'age': "1 неделя назад",
-            'duration': "28:45"
-        },
-        {
-            'id': 2,
-            'title': "Интегральное исчисление: Основные методы и примеры",
-            'channel': "Математический канал",
-            'views': "189K просмотров",
-            'age': "2 недели назад",
-            'duration': "42:18"
-        },
-        {
-            'id': 3,
-            'title': "Python для анализа данных: Pandas и NumPy",
-            'channel': "Python Практикум",
-            'views': "423K просмотров",
-            'age': "3 дня назад",
-            'duration': "35:12"
-        },
-        {
-            'id': 4,
-            'title': "Квантовая физика: Принцип неопределенности Гейзенберга",
-            'channel': "Физика для всех",
-            'views': "156K просмотров",
-            'age': "1 день назад",
-            'duration': "45:23"
-        },
-        {
-            'id': 5,
-            'title': "Основы генетики: От Менделя до современности",
-            'channel': "Биология и генетика",
-            'views': "112K просмотров",
-            'age': "5 дней назад",
-            'duration': "32:49"
-        },
-        {
-            'id': 6,
-            'title': "История Древнего Рима: От республики к империи",
-            'channel': "Исторический лекторий",
-            'views': "174K просмотров",
-            'age': "2 дня назад",
-            'duration': "38:17"
-        },
-        {
-            'id': 7,
-            'title': "Микро- и макроэкономика: Основные концепции и модели",
-            'channel': "Экономика для всех",
-            'views': "145K просмотров",
-            'age': "4 дня назад",
-            'duration': "26:35"
-        },
-        {
-            'id': 8,
-            'title': "Основы органической химии: Функциональные группы",
-            'channel': "Химия и жизнь",
-            'views': "132K просмотров",
-            'age': "6 дней назад",
-            'duration': "41:52"
-        },
-        {
-            'id': 9,
-            'title': "JavaScript продвинутый уровень: Асинхронное программирование",
-            'channel': "WebDev Мастер",
-            'views': "210К просмотров",
-            'age': "2 дня назад",
-            'duration': "47:21"
-        },
-        {
-            'id': 10,
-            'title': "Астрономия: Черные дыры и их свойства",
-            'channel': "Космос и наука",
-            'views': "328К просмотров",
-            'age': "5 дней назад",
-            'duration': "34:17"
-        },
-        {
-            'id': 11,
-            'title': "Линейная алгебра: Векторные пространства",
-            'channel': "Математический канал",
-            'views': "167K просмотров",
-            'age': "3 дня назад",
-            'duration': "39:45"
-        },
-        {
-            'id': 12,
-            'title': "React и Redux: Управление состоянием приложения",
-            'channel': "Frontend разработка",
-            'views': "198K просмотров",
-            'age': "1 неделя назад",
-            'duration': "53:28"
-        },
-        {
-            'id': 13,
-            'title': "Биохимия: Метаболические пути в клетке",
-            'channel': "Биомед",
-            'views': "98K просмотров",
-            'age': "4 дня назад",
-            'duration': "46:39"
-        },
-        {
-            'id': 14,
-            'title': "Дифференциальные уравнения: Практическое применение",
-            'channel': "Инженерные науки",
-            'views': "147K просмотров",
-            'age': "2 недели назад",
-            'duration': "57:12"
-        },
-        {
-            'id': 15,
-            'title': "Искусственный интеллект: Глубокое обучение",
-            'channel': "ИИ Академия",
-            'views': "287K просмотров",
-            'age': "3 дня назад",
-            'duration': "41:05"
-        },
-        {
-            'id': 16,
-            'title': "SQL для начинающих: Работа с базами данных",
-            'channel': "Программирование с нуля",
-            'views': "201K просмотров",
-            'age': "1 неделя назад",
-            'duration': "32:56"
-        },
-        {
-            'id': 17,
-            'title': "Античная философия: От Сократа до Аристотеля",
-            'channel': "Философские беседы",
-            'views': "114K просмотров",
-            'age': "5 дней назад",
-            'duration': "48:34"
-        },
-        {
-            'id': 18,
-            'title': "Теория вероятностей: Основные концепции",
-            'channel': "Статистика и анализ",
-            'views': "132K просмотров",
-            'age': "6 дней назад",
-            'duration': "37:18"
-        },
-        {
-            'id': 19,
-            'title': "Анатомия человека: Нервная система",
-            'channel': "Медицинский портал",
-            'views': "178K просмотров",
-            'age': "4 дня назад",
-            'duration': "44:10"
-        },
-        {
-            'id': 20,
-            'title': "HTML и CSS: Создание адаптивных веб-страниц",
-            'channel': "WebDev Мастер",
-            'views': "224K просмотров",
-            'age': "2 недели назад",
-            'duration': "36:45"
-        }
-    ]
-    
-    if query:
-        # Простой поиск: проверяем содержание каждого ключевого слова в запросе
-        matching_video_ids = set()
+    # Реализация поиска с использованием GCS
+    try:
+        from .gcs_storage import list_user_videos, get_bucket, BUCKET_NAME, generate_video_url
         
-        query_lower = query.lower()
-        for keyword, video_ids in search_mappings.items():
-            if keyword.lower() in query_lower:
-                matching_video_ids.update(video_ids)
-                
-        # Если ничего не нашли, ищем по заголовкам и каналам
-        if not matching_video_ids:
-            for i, video in enumerate(video_list, 1):
-                if (query_lower in video['title'].lower() or 
-                    query_lower in video['channel'].lower()):
-                    matching_video_ids.add(i)
+        # Получаем бакет
+        bucket = get_bucket(BUCKET_NAME)
+        if not bucket:
+            return render(request, 'main/search.html', {'query': query, 'videos': []})
+            
+        # Получаем список пользователей
+        blobs = bucket.list_blobs(delimiter='/')
+        prefixes = list(blobs.prefixes)
+        users = [prefix.replace('/', '') for prefix in prefixes]
         
-        # Собираем результаты
-        videos = [video_list[id-1] for id in matching_video_ids if 1 <= id <= len(video_list)]
-    
-    return render(request, 'main/search.html', {
-        'query': query,
-        'videos': videos
-    })
+        # Ищем среди всех видео
+        search_results = []
+        for user_id in users:
+            user_videos = list_user_videos(user_id)
+            if user_videos:
+                for video in user_videos:
+                    # Добавляем user_id к каждому видео
+                    if 'user_id' not in video:
+                        video['user_id'] = user_id
+                    
+                    # Проверяем соответствие поисковому запросу
+                    title = video.get('title', '').lower()
+                    description = video.get('description', '').lower()
+                    channel = user_id.lower()  # Поиск по имени пользователя
+                    
+                    # Если найдено совпадение, добавляем видео в результаты
+                    if (query.lower() in title or 
+                        query.lower() in description or 
+                        query.lower() in channel):
+                        
+                        # Добавляем URL для видео
+                        video_id = video.get('video_id')
+                        video['url'] = f"/video/{user_id}__{video_id}/"
+                        
+                        # Добавляем URL для миниатюры
+                        if 'thumbnail_path' in video:
+                            video['thumbnail_url'] = generate_video_url(
+                                user_id, 
+                                video_id, 
+                                file_path=video['thumbnail_path'], 
+                                expiration_time=3600
+                            )
+                            
+                        # Форматируем данные для отображения
+                        views = video.get('views', 0)
+                        if isinstance(views, int) or (isinstance(views, str) and views.isdigit()):
+                            views = int(views)
+                            if views >= 1000:
+                                video['views_formatted'] = f"{views // 1000}K просмотров"
+                            else:
+                                video['views_formatted'] = f"{views} просмотров"
+                        else:
+                            video['views_formatted'] = "0 просмотров"
+                            
+                        # Отображаемое имя канала
+                        if 'channel' not in video:
+                            video['channel'] = user_id
+                            
+                        search_results.append(video)
+        
+        return render(request, 'main/search.html', {
+            'query': query,
+            'videos': search_results
+        })
+    except Exception as e:
+        logger.error(f"Error during search: {e}")
+        return render(request, 'main/search.html', {
+            'query': query,
+            'videos': []
+        })
 
 def send_verification_code(request, email):
     # Генерируем код подтверждения (6 цифр)
