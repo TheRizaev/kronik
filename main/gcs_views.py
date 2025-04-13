@@ -11,6 +11,7 @@ from datetime import datetime
 import uuid
 import tempfile
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,119 @@ def list_videos_from_gcs(request):
         
     except Exception as e:
         logger.error(f"Error getting video list: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@require_http_methods(["GET"])
+def list_all_videos_from_gcs(request):
+    """
+    Получает список всех видео из GCS от всех пользователей
+    """
+    try:
+        # Импортируем необходимые функции
+        from .gcs_storage import list_user_videos, get_bucket, BUCKET_NAME, generate_video_url, get_user_profile_from_gcs
+        import random
+        from datetime import datetime
+        
+        # Получаем бакет
+        bucket = get_bucket(BUCKET_NAME)
+        if not bucket:
+            logger.error("Failed to get bucket")
+            return JsonResponse({'error': 'Could not get bucket'}, status=500)
+            
+        # Получаем список пользователей (папок в GCS)
+        blobs = bucket.list_blobs(delimiter='/')
+        prefixes = list(blobs.prefixes)
+        users = [prefix.replace('/', '') for prefix in prefixes]
+        
+        logger.info(f"Found users: {users}")
+        
+        # Собираем видео от всех пользователей
+        all_videos = []
+        
+        # Сохраняем профили пользователей для получения display_name
+        user_profiles = {}
+        
+        for user in users:
+            # Получаем профиль пользователя для display_name
+            user_profile = get_user_profile_from_gcs(user)
+            if user_profile:
+                user_profiles[user] = user_profile
+            
+            # Получаем видео пользователя
+            user_videos = list_user_videos(user)
+            logger.info(f"User {user} has {len(user_videos)} videos")
+            
+            if user_videos:
+                for video in user_videos:
+                    # Добавляем user_id к каждому видео
+                    if 'user_id' not in video:
+                        video['user_id'] = user
+                    
+                    # Добавляем display_name автора
+                    if user in user_profiles and user_profiles[user] and 'display_name' in user_profiles[user]:
+                        video['display_name'] = user_profiles[user]['display_name']
+                    else:
+                        video['display_name'] = user.replace('@', '')
+                        
+                    # Генерируем URL для видео
+                    video_id = video.get('video_id')
+                    if video_id:
+                        video['url'] = generate_video_url(user, video_id, expiration_time=3600)
+                        
+                        # Генерируем URL для миниатюры
+                        if 'thumbnail_path' in video and video['thumbnail_path']:
+                            try:
+                                thumbnail_blob = bucket.blob(video['thumbnail_path'])
+                                if thumbnail_blob.exists():
+                                    video['thumbnail_url'] = generate_video_url(
+                                        user,
+                                        video_id,
+                                        file_path=video['thumbnail_path'],
+                                        expiration_time=3600
+                                    )
+                            except Exception as thumb_err:
+                                logger.error(f"Error checking thumbnail for video {video_id}: {thumb_err}")
+                    
+                    # Форматируем данные для отображения
+                    if 'channel' not in video:
+                        video['channel'] = video.get('display_name', video.get('user_id', ''))
+                    
+                    # Форматируем количество просмотров
+                    views = video.get('views', 0)
+                    if isinstance(views, int) or (isinstance(views, str) and views.isdigit()):
+                        views = int(views)
+                        if views >= 1000:
+                            video['views_formatted'] = f"{views // 1000}K просмотров"
+                        else:
+                            video['views_formatted'] = f"{views} просмотров"
+                    else:
+                        video['views_formatted'] = "0 просмотров"
+                    
+                    # Форматируем дату загрузки
+                    upload_date = video.get('upload_date', '')
+                    if upload_date:
+                        try:
+                            # Преобразуем ISO формат в объект datetime
+                            upload_datetime = datetime.fromisoformat(upload_date)
+                            # Выводим только дату
+                            video['upload_date_formatted'] = upload_datetime.strftime("%d.%m.%Y")
+                        except Exception:
+                            video['upload_date_formatted'] = upload_date[:10]
+                    
+                    all_videos.append(video)
+        
+        # Перемешиваем видео для случайного порядка
+        random.shuffle(all_videos)
+        
+        logger.info(f"Returning {len(all_videos)} videos from all users")
+        
+        return JsonResponse({
+            'success': True,
+            'videos': all_videos
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting all videos list: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
 # Улучшенная функция для генерации URL

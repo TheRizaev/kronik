@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 def custom_page_not_found(request, exception):
     return render(request, 'main/404.html', status=404)
 
+
 def index(request):
     categories = Category.objects.all()
     
@@ -132,6 +133,7 @@ def index(request):
 def video_detail(request, video_id):
     """
     Показывает подробную информацию о видео из GCS.
+    Оптимизированная версия с улучшенной обработкой отображаемых имен.
     
     Args:
         request: HTTP request
@@ -169,17 +171,36 @@ def video_detail(request, video_id):
             logger.error(f"Could not find user for video {gcs_video_id}")
             return render(request, 'main/404.html', status=404)
             
+        # Оптимизация: загружаем всю необходимую информацию параллельно
+        import concurrent.futures
         from .gcs_storage import get_video_metadata, generate_video_url, get_video_comments, get_user_profile_from_gcs
         
-        # Получаем метаданные видео
-        metadata = get_video_metadata(user_id, gcs_video_id)
+        # Функции для параллельного выполнения
+        def fetch_metadata():
+            return get_video_metadata(user_id, gcs_video_id)
+            
+        def fetch_user_profile():
+            return get_user_profile_from_gcs(user_id)
+            
+        def fetch_comments():
+            return get_video_comments(user_id, gcs_video_id)
+            
+        # Выполняем запросы параллельно
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            metadata_future = executor.submit(fetch_metadata)
+            profile_future = executor.submit(fetch_user_profile)
+            comments_future = executor.submit(fetch_comments)
+            
+            # Получаем результаты
+            metadata = metadata_future.result()
+            user_profile = profile_future.result()
+            comments_data = comments_future.result()
         
         if not metadata:
             logger.error(f"Could not find metadata for video {gcs_video_id} from user {user_id}")
             return render(request, 'main/404.html', status=404)
         
-        # Получаем профиль пользователя для display_name
-        user_profile = get_user_profile_from_gcs(user_id)
+        # Получаем display_name пользователя для корректного отображения автора
         display_name = user_profile.get('display_name', user_id.replace('@', '')) if user_profile else user_id.replace('@', '')
             
         # Получаем временный URL для видео
@@ -195,9 +216,6 @@ def video_detail(request, video_id):
                 expiration_time=3600
             )
         
-        # Получаем комментарии
-        comments_data = get_video_comments(user_id, gcs_video_id)
-        
         # Подготавливаем данные для шаблона
         video_data = {
             'id': f"{user_id}__{gcs_video_id}",  # Составной ID для URL
@@ -206,6 +224,7 @@ def video_detail(request, video_id):
             'title': metadata.get('title', 'Без названия'),
             'description': metadata.get('description', 'Без описания'),
             'channel': display_name,             # Используем display_name из профиля
+            'display_name': display_name,        # Явно добавляем display_name
             'views': metadata.get('views', 0),
             'views_formatted': f"{metadata.get('views', 0)} просмотров",
             'likes': metadata.get('likes', 0),
@@ -218,7 +237,7 @@ def video_detail(request, video_id):
             'age': metadata.get('age_text', 'Недавно')
         }
         
-        # Получаем рекомендуемые видео (можно использовать те же функции, что в index)
+        # Получаем рекомендуемые видео с помощью оптимизированной функции
         recommended_videos = get_recommended_videos(user_id, gcs_video_id)
         
         return render(request, 'main/video.html', {
@@ -233,7 +252,7 @@ def video_detail(request, video_id):
 def get_recommended_videos(current_user_id, current_video_id, limit=10):
     """
     Получает рекомендованные видео на основе текущего видео.
-    Принцип работы: получаем все видео из GCS, исключаем текущее и перемешиваем.
+    Оптимизированная версия: получаем все видео из GCS, исключаем текущее и перемешиваем.
     
     Args:
         current_user_id: ID пользователя текущего видео
@@ -245,6 +264,8 @@ def get_recommended_videos(current_user_id, current_video_id, limit=10):
     """
     try:
         from .gcs_storage import list_user_videos, get_bucket, BUCKET_NAME, generate_video_url, get_user_profile_from_gcs
+        import random
+        import concurrent.futures
         
         # Получаем бакет
         bucket = get_bucket(BUCKET_NAME)
@@ -259,33 +280,54 @@ def get_recommended_videos(current_user_id, current_video_id, limit=10):
         # Кэш для профилей пользователей
         user_profiles = {}
         
-        # Собираем все видео
+        # Используем ThreadPoolExecutor для параллельной загрузки видео
         all_videos = []
-        for user_id in users:
+        
+        # Функция для загрузки видео одного пользователя
+        def load_user_videos(user_id):
+            videos_list = []
+            user_videos = list_user_videos(user_id)
+            
+            if not user_videos:
+                return videos_list
+                
             # Получаем профиль пользователя для display_name
             if user_id not in user_profiles:
                 user_profile = get_user_profile_from_gcs(user_id)
                 user_profiles[user_id] = user_profile
+            else:
+                user_profile = user_profiles[user_id]
             
-            user_videos = list_user_videos(user_id)
-            if user_videos:
-                for video in user_videos:
-                    # Пропускаем текущее видео
-                    if user_id == current_user_id and video.get('video_id') == current_video_id:
-                        continue
-                        
-                    # Добавляем user_id к видео
-                    if 'user_id' not in video:
-                        video['user_id'] = user_id
+            for video in user_videos:
+                # Пропускаем текущее видео
+                if user_id == current_user_id and video.get('video_id') == current_video_id:
+                    continue
                     
-                    # Добавляем display_name
-                    if user_id in user_profiles and user_profiles[user_id] and 'display_name' in user_profiles[user_id]:
-                        video['display_name'] = user_profiles[user_id]['display_name']
-                    else:
-                        # Если display_name отсутствует, используем username без префикса @
-                        video['display_name'] = user_id.replace('@', '')
-                        
-                    all_videos.append(video)
+                # Добавляем user_id к видео
+                if 'user_id' not in video:
+                    video['user_id'] = user_id
+                
+                # Добавляем display_name
+                if user_id in user_profiles and user_profiles[user_id] and 'display_name' in user_profiles[user_id]:
+                    video['display_name'] = user_profiles[user_id]['display_name']
+                else:
+                    # Если display_name отсутствует, используем username без префикса @
+                    video['display_name'] = user_id.replace('@', '')
+                    
+                videos_list.append(video)
+            
+            return videos_list
+            
+        # Загружаем видео параллельно с таймаутом
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_user = {executor.submit(load_user_videos, user_id): user_id for user_id in users}
+            for future in concurrent.futures.as_completed(future_to_user, timeout=5):
+                try:
+                    user_videos = future.result()
+                    all_videos.extend(user_videos)
+                except Exception as e:
+                    user_id = future_to_user[future]
+                    logger.error(f"Error loading videos for user {user_id}: {e}")
         
         # Перемешиваем видео
         random.shuffle(all_videos)
@@ -327,6 +369,7 @@ def get_recommended_videos(current_user_id, current_video_id, limit=10):
                     video['views_formatted'] = "0 просмотров"
                     
         return recommended
+        
     except Exception as e:
         logger.error(f"Error getting recommended videos: {e}")
         return []
