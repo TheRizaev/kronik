@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    {% load static %}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}KRONIK{% endblock %}</title>
+    <!-- Подключение favicon -->
+    <link rel="shortcut icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+    <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+    <link rel="stylesheet" href="{% static 'css/error-pages.css' %}">
+    <link rel="stylesheet" href="{% static 'css/profile-styles.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dropdown-styles.css' %}">
+    <link rel="stylesheet" href="{% static 'css/fixes.css' %}">
+    <!-- Add studio.css if we're on the studio page -->
+    {% if request.path == '/studio/' %}
+    <link rel="stylesheet" href="{% static 'css/studio.css' %}">
+    {% endif %}
+</head>
+<body class="dark-theme">
+    <div class="theme-transition dark"></div>
+    
+    <header>
+        <button id="sidebar-toggle" class="sidebar-toggle" style="color: #ffffff">☰</button>
+        <div class="logo">
+            <img src="{% static 'Kronik-Light1.png' %}" alt="KRONIK" class="logo-img" width="50" height="50">
+            <span class="logo-text">KRONIK</span> 
+        </div>
+        <div class="search-container">
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="Поиск...">
+                <button class="search-button"><img src="/static/icons/loop.svg" alt="Light mode" width="32" height="32"></button>
+                <div class="search-dropdown" id="search-dropdown">
+                    <!-- Результаты поиска будут добавляться сюда -->
+                </div>
+            </div>
+        </div>
+        <div class="actions">
+            <div class="notification-button">
+                <button class="notification-icon">
+                    <img src="/static/icons/notification.svg" alt="Уведомления" width="24" height="24">
+                    <span class="notification-badge">0</span>
+                </button>
+                <div class="notification-dropdown">
+                    <div class="notification-header">
+                        <h3>Уведомления</h3>
+                    </div>
+                    <div class="notification-content">
+                        {% if user.is_authenticated %}
+                            <div class="empty-notifications">
+                                <div class="empty-icon"><img src="/static/icons/notification.svg" alt="Уведомления" width="80" height="80"></div>
+                                <p>У вас пока нет уведомлений</p>
+                            </div>
+                        {% else %}
+                            <div class="notification-login-required">
+                                <div class="login-icon"><img src="/static/icons/lock.svg" alt="Уведомления" width="80" height="80"></div>
+                                <p>Авторизуйтесь, чтобы видеть уведомления</p>
+                                <div class="notification-login-buttons">
+                                    <a href="{% url 'login' %}" class="notification-login-btn">Войти</a>
+                                    <a href="{% url 'register' %}" class="notification-register-btn">Регистрация</a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <button class="theme-toggle">
+                <span class="theme-icon sun"><img src="/static/icons/moon.svg" alt="Light mode" width="24" height="24"></span>
+                <span class="theme-icon moon"><img src="/static/icons/sun.svg" alt="Dark mode" width="24" height="24"></span>
+                <span class="toggle-text"></span>
+            </button>
+            
+            <div class="user-menu">
+                {% if user.is_authenticated %}
+                    <div class="avatar">
+                        {% if user_avatar_url %}
+                            <img src="{{ user_avatar_url }}" alt="{{ user.profile.display_name|default:user.username }}">
+                        {% else %}
+                            {{ user.profile.display_name|first|default:user.username|first }}
+                        {% endif %}
+                    </div>
+                    <div class="user-dropdown">
+                        <div class="user-header">
+                            <div class="avatar">
+                                {% if user_avatar_url %}
+                                    <img src="{{ user_avatar_url }}" alt="{{ user.profile.display_name|default:user.username }}">
+                                {% else %}
+                                    {{ user.profile.display_name|first|default:user.username|first }}
+                                {% endif %}
+                            </div>
+                            <div>
+                                <div class="user-name">{{ user.profile.display_name|default:user.username }}</div>
+                                <div class="user-email">{{ user.username }}</div>
+                            </div>
+                        </div>
+                        <div class="dropdown-item" onclick="window.location.href='{% url 'profile' %}'">
+                            <div class="icon"><img src="/static/icons/profile.svg" alt="Профиль" width="24" height="24"></div>
+                            <div>Мой профиль</div>
+                        </div>
+                        
+                        <div class="dropdown-item settings-btn" onclick="window.location.href='{% url 'profile_settings' %}'">
+                            <div class="icon"><img src="/static/icons/settings.svg" alt="Настройки" width="24" height="24"></div>
+                            <div>Настройки</div>
+                        </div>
+                        
+                        {% if user.profile.is_author %}
+                        <div class="dropdown-item" onclick="window.location.href='{% url 'studio' %}'">
+                            <div class="icon"><img src="/static/icons/camera.svg" alt="Студия" width="24" height="24"></div>
+                            <div>Студия</div>
+                        </div>
+                        {% elif not user.profile.author_application_pending %}
+                        <div class="dropdown-item" onclick="window.location.href='{% url 'become_author' %}'">
+                            <div class="icon"><img src="/static/icons/hand.svg" alt="Стать автором" width="24" height="24"></div>
+                            <div>Стать автором</div>
+                        </div>
+                        {% else %}
+                        <div class="dropdown-item" style="cursor: default; opacity: 0.7;">
+                            <div class="icon"><img src="/static/icons/sandtimer.svg" alt="В ожидании" width="24" height="24"></div>
+                            <div>Заявка на рассмотрении</div>
+                        </div>
+                        {% endif %}
+                        <div class="dropdown-item">
+                            <div class="icon"><img src="/static/icons/courses.svg" alt="Курсы" width="24" height="24"></div>
+                            <div>Мои курсы</div>
+                        </div>
+                        <div class="dropdown-item">
+                            <div class="icon"><img src="/static/icons/books.svg" alt="Библиотека" width="24" height="24"></div>
+                            <div>Библиотека</div>
+                        </div>
+                        <div class="dropdown-item">
+                            <div class="icon"><img src="/static/icons/progress.svg" alt="Прогресс" width="24" height="24"></div>
+                            <div>Прогресс обучения</div>
+                        </div>
+                        <div class="dropdown-item">
+                            <div class="icon"><img src="/static/icons/loop.svg" alt="Помощь" width="24" height="24"></div>
+                            <div>Помощь</div>
+                        </div>
+                        <div class="dropdown-item" onclick="window.location.href='{% url 'logout' %}'">
+                            <div class="icon"><img src="/static/icons/exit.svg" alt="Выход" width="24" height="24"></div>
+                            <div>Выход</div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="auth-buttons">
+                        <a href="{% url 'login' %}" class="login-button">Войти</a>
+                        <a href="{% url 'register' %}" class="register-button">Регистрация</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+    
+    <div class="overlay"></div>
+    
+    <div class="main-container">
+        <div class="sidebar" id="sidebar">
+            <div class="menu-item {% if request.path == '/' %}active{% endif %}" onclick="window.location.href='{% url 'index' %}'">
+                <div class="menu-icon"><img src="/static/icons/house.svg" alt="Dark mode" width="32" height="32"></div>
+                <div class="menu-text">Главная</div>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon"><img src="/static/icons/courses.svg" alt="Dark mode" width="32" height="32"></div>
+                <div class="menu-text">Курсы</div>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon"><img src="/static/icons/books.svg" alt="Dark mode" width="32" height="32"></div>
+                <div class="menu-text">Библиотека</div>
+            </div>
+            <div class="menu-item subscriptions-toggle" id="subscriptions-toggle">
+                <div class="menu-icon"><img src="/static/icons/tip.svg" alt="Подписки" width="24" height="24"></div>
+                <div class="menu-text">Подписки{% if subscription_count %} ({{ subscription_count }}){% endif %}</div>
+                <div class="toggle-icon">▶</div>
+            </div>
+            <div class="subscriptions-list" id="subscriptions-list">
+                <!-- Subscriptions will be loaded here -->
+                <div class="subscription-loading">Загрузка подписок...</div>
+            </div>
+            
+            {% if user.is_authenticated %}
+            <div class="menu-item {% if request.path == '/studio/' %}active{% endif %}" onclick="window.location.href='{% url 'studio' %}'">
+                <div class="menu-icon"><img src="/static/icons/camera.svg" alt="Dark mode" width="32" height="32"></div>
+                <div class="menu-text">Студия</div>
+            </div>
+            {% endif %}
+            
+            <div class="sidebar-section">
+                <div class="sidebar-title">ВЫ</div>
+                <div class="menu-item">
+                    <div class="menu-icon"><img src="/static/icons/like.svg" alt="Понравившиеся" width="24" height="24"></div>
+                    <div class="menu-text">Понравившиеся</div>
+                </div>
+                <div class="menu-item">
+                    <div class="menu-icon"><img src="/static/icons/timer.svg" alt="История" width="24" height="24"></div>
+                    <div class="menu-text">История просмотров</div>
+                </div>
+                <div class="menu-item">
+                    <div class="menu-icon"><img src="/static/icons/playlist.svg" alt="Плейлисты" width="24" height="24"></div>
+                    <div class="menu-text">Мои плейлисты</div>
+                </div>
+                <div class="menu-item">
+                    <div class="menu-icon"><img src="/static/icons/progress.svg" alt="Прогресс" width="24" height="24"></div>
+                    <div class="menu-text">Прогресс обучения</div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">ИНСТРУМЕНТЫ</div>
+                <div class="menu-item">
+                    <div class="menu-icon"><img src="/static/icons/paper.svg" alt="Light mode" width="24" height="24"></div>
+                    <div class="menu-text">Заметки</div>
+                </div>
+                <div class="menu-item">
+                    <div class="menu-icon"><img src="/static/icons/calendar.svg" alt="Light mode" width="24" height="24"></div>
+                    <div class="menu-text">Расписание</div>
+                </div>
+                <div class="menu-item {% if request.path == '/search-page/' %}active{% endif %}" onclick="window.location.href='{% url 'search_page' %}'">
+                    <div class="menu-icon"><img src="/static/icons/loop.svg" alt="Light mode" width="24" height="24"></div>
+                    <div class="menu-text">Поиск</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    
+    <script src="{% static 'js/main.js' %}"></script>
+    <script src="{% static 'js/search.js' %}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+<style>
+/* Subscriptions menu styles */
+.subscriptions-toggle {
+    position: relative;
+}
+
+.toggle-icon {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%) rotate(0deg);
+    transition: transform 0.3s ease;
+    font-size: 10px;
+    color: var(--gray-color);
+}
+
+.subscriptions-toggle.active .toggle-icon {
+    transform: translateY(-50%) rotate(90deg);
+}
+
+.subscriptions-list {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+    padding-left: 10px;
+}
+
+.subscriptions-list.show {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.subscription-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 15px;
+    margin: 5px 0;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.subscription-item:hover {
+    background-color: rgba(159, 37, 88, 0.1);
+}
+
+.dark-theme .subscription-item:hover {
+    background-color: rgba(159, 37, 88, 0.2);
+}
+
+.subscription-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: var(--accent-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    margin-right: 10px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.subscription-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.subscription-name {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-dark);
+}
+
+.dark-theme .subscription-name {
+    color: var(--text-light);
+}
+
+.subscription-loading {
+    padding: 10px 15px;
+    color: var(--gray-color);
+    font-size: 13px;
+    font-style: italic;
+}
+
+.no-subscriptions {
+    padding: 10px 15px;
+    color: var(--gray-color);
+    font-size: 13px;
+    text-align: center;
+}
+
+/* Add animation for subscription items */
+@keyframes fadeInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.subscription-item {
+    animation: fadeInLeft 0.3s ease forwards;
+    opacity: 0;
+}
+
+.subscription-item:nth-child(2) { animation-delay: 0.05s; }
+.subscription-item:nth-child(3) { animation-delay: 0.1s; }
+.subscription-item:nth-child(4) { animation-delay: 0.15s; }
+.subscription-item:nth-child(5) { animation-delay: 0.2s; }
+.subscription-item:nth-child(6) { animation-delay: 0.25s; }
+.subscription-item:nth-child(7) { animation-delay: 0.3s; }
+.subscription-item:nth-child(8) { animation-delay: 0.35s; }
+.subscription-item:nth-child(9) { animation-delay: 0.4s; }
+.subscription-item:nth-child(10) { animation-delay: 0.45s; }
+</style>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const notificationButton = document.querySelector('.notification-icon');
+        const notificationDropdown = document.querySelector('.notification-dropdown');
+        
+        if (notificationButton && notificationDropdown) {
+            notificationButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                notificationDropdown.classList.toggle('show');
+            });
+            
+            // Close when clicking outside
+            document.addEventListener('click', function(e) {
+                if (notificationButton && notificationDropdown && 
+                    !notificationButton.contains(e.target) && 
+                    !notificationDropdown.contains(e.target)) {
+                    notificationDropdown.classList.remove('show');
+                }
+            });
+        }
+        const subscriptionsToggle = document.getElementById('subscriptions-toggle');
+    const subscriptionsList = document.getElementById('subscriptions-list');
+    
+    // Only initialize if elements exist and user is authenticated
+    if (subscriptionsToggle && subscriptionsList {% if user.is_authenticated %} && true {% else %} && false {% endif %}) {
+        let subscriptionsLoaded = false;
+        
+        // Toggle subscriptions list
+        subscriptionsToggle.addEventListener('click', function() {
+            subscriptionsToggle.classList.toggle('active');
+            subscriptionsList.classList.toggle('show');
+            
+            // Load subscriptions if not loaded yet
+            if (!subscriptionsLoaded) {
+                loadSubscriptions();
+                subscriptionsLoaded = true;
+            }
+        });
+        
+        // Function to load subscriptions
+        function loadSubscriptions() {
+            fetch('/api/get-subscriptions/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.subscriptions) {
+                        renderSubscriptions(data.subscriptions);
+                    } else {
+                        showNoSubscriptions();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading subscriptions:', error);
+                    showNoSubscriptions();
+                });
+        }
+        
+        // Function to render subscriptions
+        function renderSubscriptions(subscriptions) {
+            subscriptionsList.innerHTML = '';
+            
+            if (subscriptions.length === 0) {
+                showNoSubscriptions();
+                return;
+            }
+            
+            subscriptions.forEach(subscription => {
+                const item = document.createElement('div');
+                item.className = 'subscription-item';
+                item.onclick = function() {
+                    window.location.href = `/channel/${subscription.channel_id}/`;
+                };
+                
+                // Determine avatar content - use avatar_url if available
+                let avatarContent = '';
+                if (subscription.avatar_url) {
+                    avatarContent = `<img src="${subscription.avatar_url}" alt="${subscription.display_name}">`;
+                } else {
+                    avatarContent = subscription.display_name.charAt(0);
+                }
+                
+                item.innerHTML = `
+                    <div class="subscription-avatar">${avatarContent}</div>
+                    <div class="subscription-name">${subscription.display_name}</div>
+                `;
+                
+                subscriptionsList.appendChild(item);
+            });
+        }
+        
+        // Function to show no subscriptions message
+        function showNoSubscriptions() {
+            subscriptionsList.innerHTML = `
+                <div class="no-subscriptions">У вас пока нет подписок</div>
+            `;
+        }
+    }
+    });
+</script>

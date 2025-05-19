@@ -1,0 +1,226 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block title %}Регистрация - KRONIK{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-form-container">
+        <h2 class="auth-title">Регистрация</h2>
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <form method="POST" class="auth-form" id="registration-form">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="id_username">Имя пользователя</label>
+                <div class="username-field-wrapper">
+                    <span class="username-prefix">@</span>
+                    {{ form.username }}
+                </div>
+                {% if form.username.errors %}
+                    <div class="form-error">{{ form.username.errors }}</div>
+                {% endif %}
+                <small class="form-help">Только латинские буквы и цифры, до 20 символов. Регистр не важен.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="id_email">Email</label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <div class="form-error">{{ form.email.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="id_date_of_birth">Дата рождения</label>
+                {{ form.date_of_birth }}
+                {% if form.date_of_birth.errors %}
+                    <div class="form-error">{{ form.date_of_birth.errors }}</div>
+                {% endif %}
+                <small class="form-help">Формат: ДД.ММ.ГГГГ</small>
+            </div>
+            
+            <div class="form-group">
+                <label>Пол</label>
+                <div class="gender-options">
+                    {% for choice in form.gender %}
+                    <div class="gender-option">
+                        {{ choice.tag }}
+                        <label for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if form.gender.errors %}
+                    <div class="form-error">{{ form.gender.errors }}</div>
+                {% endif %}
+                <small class="form-help">Укажите ваш пол</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="id_password1">Пароль</label>
+                {{ form.password1 }}
+                {% if form.password1.errors %}
+                    <div class="form-error">{{ form.password1.errors }}</div>
+                {% endif %}
+                <!-- Password strength indicator will be added here by JS -->
+            </div>
+            
+            <div class="form-group">
+                <label for="id_password2">Подтверждение пароля</label>
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                    <div class="form-error">{{ form.password2.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <button type="submit" class="auth-button">Зарегистрироваться</button>
+        </form>
+        
+        <div class="auth-links">
+            <p>Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a></p>
+        </div>
+    </div>
+</div>
+
+<style>
+.username-field-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.username-prefix {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    color: var(--primary-color);
+    font-weight: bold;
+    z-index: 2;
+}
+
+#id_username {
+    padding-left: 30px !important;
+}
+
+/* Стили для полей выбора пола */
+.gender-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding: 10px 0;
+}
+
+.gender-option {
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 8px 15px;
+}
+
+.gender-option:hover {
+    background-color: rgba(159, 37, 88, 0.1);
+}
+
+/* Скрываем стандартную радиокнопку */
+.gender-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+}
+
+/* Создаем стилизованную кнопку */
+.gender-option label {
+    position: relative;
+    padding-left: 30px;
+    cursor: pointer;
+    display: inline-block;
+    font-weight: normal;
+    user-select: none;
+    color: var(--accent-color);
+}
+
+/* Создаем квадрат для чекбокса */
+.gender-option label:before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--accent-color);
+    border-radius: 4px;
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+/* Создаем галочку (скрытую изначально) */
+.gender-option label:after {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 3px;
+    width: 6px;
+    height: 12px;
+    border: solid var(--accent-color);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+/* Показываем галочку при выборе */
+.gender-option input[type="radio"]:checked + label:after {
+    opacity: 1;
+}
+
+/* Изменение стиля при наведении */
+.gender-option label:hover:before {
+    border-color: var(--primary-color);
+}
+
+/* Стили для темного режима */
+.dark-theme .gender-option:hover {
+    background-color: rgba(159, 37, 88, 0.2);
+}
+
+.dark-theme .gender-option label {
+    color: var(--primary-color);
+}
+
+.dark-theme .gender-option label:before {
+    border-color: var(--primary-color);
+}
+
+.dark-theme .gender-option label:after {
+    border-color: var(--primary-color);
+}
+
+/* Меняем стиль для выбранной опции */
+.gender-option input[type="radio"]:checked + label {
+    font-weight: bold;
+}
+
+/* Добавляем небольшой эффект при клике */
+.gender-option input[type="radio"]:active + label:before {
+    transform: scale(0.9);
+}
+</style>
+
+<script src="{% static 'js/form-enhancements.js' %}"></script>
+{% endblock %}

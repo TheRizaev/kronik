@@ -1,0 +1,527 @@
+{% extends 'main/base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %}{{ query }} - Результаты поиска - KRONIK{% endblock %}
+
+{% block content %}
+<div class="search-results-container">
+    <h1 class="search-heading">Результаты поиска: <span class="search-query">{{ query }}</span></h1>
+    
+    <div class="search-filter">
+        <div class="filter-item active" data-filter="all">Все</div>
+        <div class="filter-item" data-filter="videos">Видео</div>
+        <div class="filter-item" data-filter="courses">Курсы</div>
+        <div class="filter-item" data-filter="channels">Каналы</div>
+    </div>
+    
+    <div class="search-results-list" id="search-results-container">
+        {% if is_loading %}
+            {% for i in placeholder_count|get_range %}
+            <div class="search-result-item placeholder-card placeholder-animate" data-type="videos">
+                <div class="result-thumbnail placeholder-thumbnail">
+                    <div class="placeholder-thumbnail-inner"></div>
+                </div>
+                <div class="result-details">
+                    <h3 class="result-title placeholder-title"></h3>
+                    <div class="result-meta placeholder-meta"></div>
+                    <div class="result-channel">
+                        <div class="avatar avatar-medium placeholder-avatar"></div>
+                        <div class="channel-name placeholder-channel"></div>
+                    </div>
+                    <div class="result-description placeholder-description"></div>
+                </div>
+            </div>
+            {% endfor %}
+        {% elif videos %}
+            {% for video in videos %}
+            <div class="search-result-item" data-type="videos" onclick="window.location.href = '/video/{{ video.user_id }}__{{ video.video_id }}/'">
+                <div class="result-thumbnail">
+                    {% if video.thumbnail_url %}
+                        <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" loading="lazy" onerror="this.src='{% static 'placeholder.jpg' %}'">
+                    {% else %}
+                        <img src="{% static 'placeholder.jpg' %}" alt="{{ video.title }}" loading="lazy" data-user-id="{{ video.user_id }}" data-video-id="{{ video.video_id }}" class="lazy-thumbnail">
+                    {% endif %}
+                    <div class="result-duration">{{ video.duration|default:"00:00" }}</div>
+                </div>
+                <div class="result-details">
+                    <h3 class="result-title">{{ video.title }}</h3>
+                    <div class="result-meta">{{ video.views_formatted|default:"0 просмотров" }} • {{ video.upload_date_formatted|default:"Недавно" }}</div>
+                    <div class="result-channel">
+                        <div class="avatar avatar-medium">
+                            {% if video.avatar_url %}
+                                <img src="{{ video.avatar_url }}" alt="{{ video.display_name|default:video.channel }}" loading="lazy">
+                            {% else %}
+                                <span class="avatar-text">{{ video.display_name|first|default:video.channel|first }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="channel-name">{{ video.display_name|default:video.channel }}</div>
+                    </div>
+                    <div class="result-description">
+                        {{ video.description|default:""|truncatechars:150 }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-results">
+                <h3>По запросу "{{ query }}" ничего не найдено</h3>
+                <p>Попробуйте изменить запрос или выбрать другую категорию</p>
+                <div class="search-suggestions">
+                    <h4>Возможно, вас заинтересует:</h4>
+                    <div class="suggestion-tags">
+                        <a href="/search?query=программирование" class="suggestion-tag">программирование</a>
+                        <a href="/search?query=математика" class="suggestion-tag">математика</a>
+                        <a href="/search?query=физика" class="suggestion-tag">физика</a>
+                        <a href="/search?query=история" class="suggestion-tag">история</a>
+                        <a href="/search?query=CORE" class="suggestion-tag">CORE</a>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+    {% if videos|length >= 10 %}
+    <div class="load-more-container">
+        <button id="load-more-btn" class="load-more-button">Загрузить ещё</button>
+    </div>
+    {% endif %}
+    
+    <div class="debug-toggle-container">
+        <button id="toggle-debug" class="debug-toggle">Показать отладочную информацию</button>
+    </div>
+    
+    <div id="debug-info" class="debug-info" style="display:none;">
+        <h3>Отладочная информация</h3>
+        
+        <div class="debug-section">
+            <h4>Параметры запроса</h4>
+            <div class="debug-content">
+                <p><strong>Запрос:</strong> {{ debug.query }}</p>
+                <p><strong>Смещение:</strong> {{ debug.offset }}</p>
+                <p><strong>Лимит:</strong> {{ debug.limit }}</p>
+                <p><strong>Всего найдено видео:</strong> {{ debug.total_videos_found|default:"0" }}</p>
+                <p><strong>Найдено результатов:</strong> {{ debug.total_results|default:"0" }}</p>
+                <p><strong>Возвращено результатов:</strong> {{ debug.results_returned|default:"0" }}</p>
+            </div>
+        </div>
+        
+        <div class="debug-section">
+            <h4>Шаги поиска</h4>
+            <div class="debug-content">
+                <ol>
+                    {% for step in debug.scan_steps %}
+                    <li>{{ step }}</li>
+                    {% empty %}
+                    <li>Нет информации о шагах поиска</li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </div>
+        
+        {% if debug.core_videos_count is not None %}
+        <div class="debug-section">
+            <h4>Видео с "CORE" в названии ({{ debug.core_videos_count }})</h4>
+            <div class="debug-content">
+                <ul>
+                    {% for video in debug.core_videos %}
+                    <li>{{ video.title }} ({{ video.user_id }}/{{ video.video_id }})</li>
+                    {% empty %}
+                    <li>Не найдено видео с "CORE" в названии</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="debug-section">
+            <h4>Пользователи ({{ debug.users|length }} из {{ debug.users|length }})</h4>
+            <div class="debug-content">
+                <ul>
+                    {% for user in debug.users %}
+                    <li>{{ user }}</li>
+                    {% empty %}
+                    <li>Нет информации о пользователях</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+        <div class="debug-section">
+            <h4>Примеры найденных видео ({{ debug.all_videos_sample|length }} из {{ debug.total_videos_found|default:"0" }})</h4>
+            <div class="debug-content">
+                <ul>
+                    {% for video in debug.all_videos_sample %}
+                    <li>{{ video.title }} ({{ video.user_id }}/{{ video.video_id }})</li>
+                    {% empty %}
+                    <li>Нет информации о найденных видео</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+        <div class="debug-section">
+            <h4>Ошибки</h4>
+            <div class="debug-content">
+                <ul>
+                    {% for error in debug.errors %}
+                    <li class="error">{{ error }}</li>
+                    {% empty %}
+                    <li>Нет ошибок</li>
+                    {% endfor %}
+                </ul>
+                
+                {% if debug.traceback %}
+                <div class="debug-traceback">
+                    <h5>Traceback</h5>
+                    <pre>{{ debug.traceback }}</pre>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Placeholder styles */
+.placeholder-thumbnail {
+    background-color: rgba(159, 37, 88, 0.1);
+}
+
+.dark-theme .placeholder-thumbnail {
+    background-color: rgba(159, 37, 88, 0.2);
+}
+
+.placeholder-thumbnail-inner {
+    width: 100%;
+    height: 100%;
+}
+
+.placeholder-title {
+    height: 24px;
+    width: 80%;
+    background-color: rgba(159, 37, 88, 0.1);
+    margin-bottom: 10px;
+}
+
+.dark-theme .placeholder-title {
+    background-color: rgba(159, 37, 88, 0.2);
+}
+
+.placeholder-meta {
+    height: 16px;
+    width: 60%;
+    background-color: rgba(159, 37, 88, 0.1);
+    margin-bottom: 10px;
+}
+
+.dark-theme .placeholder-meta {
+    background-color: rgba(159, 37, 88, 0.2);
+}
+
+.placeholder-avatar {
+    background-color: rgba(159, 37, 88, 0.1);
+}
+
+.dark-theme .placeholder-avatar {
+    background-color: rgba(159, 37, 88, 0.2);
+}
+
+.placeholder-channel {
+    height: 16px;
+    width: 40%;
+    background-color: rgba(159, 37, 88, 0.1);
+}
+
+.dark-theme .placeholder-channel {
+    background-color: rgba(159, 37, 88, 0.2);
+}
+
+.placeholder-description {
+    height: 32px;
+    width: 100%;
+    background-color: rgba(159, 37, 88, 0.1);
+}
+
+.dark-theme .placeholder-description {
+    background-color: rgba(159, 37, 88, 0.2);
+}
+
+/* Search suggestions */
+.search-suggestions {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: rgba(159, 37, 88, 0.05);
+    border-radius: 8px;
+}
+
+.dark-theme .search-suggestions {
+    background-color: rgba(159, 37, 88, 0.1);
+}
+
+.suggestion-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.suggestion-tag {
+    padding: 8px 15px;
+    background-color: rgba(159, 37, 88, 0.1);
+    border-radius: 20px;
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.suggestion-tag:hover {
+    background-color: rgba(159, 37, 88, 0.2);
+    transform: translateY(-2px);
+}
+
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    margin: 30px 0;
+}
+
+.load-more-button {
+    padding: 10px 25px;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.load-more-button:hover {
+    background-color: #7d1e46;
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(159, 37, 88, 0.3);
+}
+
+/* Placeholder animation */
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.placeholder-animate::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0,
+        rgba(255, 255, 255, 0.2) 20%,
+        rgba(255, 255, 255, 0.5) 60%,
+        rgba(255, 255, 255, 0)
+    );
+    animation: shimmer 2s infinite;
+}
+
+.dark-theme .placeholder-animate::after {
+    background-image: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0,
+        rgba(255, 255, 255, 0.1) 20%,
+        rgba(255, 255, 255, 0.2) 60%,
+        rgba(255, 255, 255, 0)
+    );
+}
+
+/* Channel name styles */
+.result-channel .channel-name {
+    font-size: 14px;
+    color: rgba(159, 37, 88, 0.7);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.dark-theme .result-channel .channel-name {
+    color: rgba(255, 176, 201, 0.9);
+}
+
+.result-channel .channel-name:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchResultsContainer = document.getElementById('search-results-container');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    const query = "{{ query }}";
+    let currentOffset = {{ videos|length|default:"0" }};
+    let isLoading = false;
+    
+    {% if is_loading %}
+    fetchSearchResults(0, {{ placeholder_count|default:"6" }});
+    {% endif %}
+    
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', function() {
+            if (!isLoading) {
+                fetchSearchResults(currentOffset, 10);
+            }
+        });
+    }
+    
+    function fetchSearchResults(offset, limit) {
+        if (isLoading) return;
+        
+        isLoading = true;
+        if (loadMoreBtn) {
+            loadMoreBtn.textContent = 'Загрузка...';
+            loadMoreBtn.disabled = true;
+        }
+        
+        fetch(`/search?query=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}&format=json`)
+            .then(response => response.json())
+            .then(data => {
+                if (offset === 0 && document.querySelector('.placeholder-card')) {
+                    searchResultsContainer.innerHTML = '';
+                }
+                
+                if (data.success && data.videos && data.videos.length > 0) {
+                    appendSearchResults(data.videos);
+                    currentOffset += data.videos.length;
+                    
+                    if (loadMoreBtn) {
+                        if (currentOffset >= data.total) {
+                            loadMoreBtn.style.display = 'none';
+                        } else {
+                            loadMoreBtn.textContent = 'Загрузить ещё';
+                            loadMoreBtn.disabled = false;
+                        }
+                    }
+                } else {
+                    if (offset === 0) {
+                        searchResultsContainer.innerHTML = `
+                            <div class="no-results">
+                                <h3>По запросу "${query}" ничего не найдено</h3>
+                                <p>Попробуйте изменить запрос или выбрать другую категорию</p>
+                                <div class="search-suggestions">
+                                    <h4>Возможно, вас заинтересует:</h4>
+                                    <div class="suggestion-tags">
+                                        <a href="/search?query=программирование" class="suggestion-tag">программирование</a>
+                                        <a href="/search?query=математика" class="suggestion-tag">математика</a>
+                                        <a href="/search?query=физика" class="suggestion-tag">физика</a>
+                                        <a href="/search?query=история" class="suggestion-tag">история</a>
+                                        <a href="/search?query=CORE" class="suggestion-tag">CORE</a>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (loadMoreBtn) {
+                        loadMoreBtn.style.display = 'none';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Search error:', error);
+                if (loadMoreBtn) {
+                    loadMoreBtn.textContent = 'Ошибка загрузки';
+                    setTimeout(() => {
+                        loadMoreBtn.textContent = 'Повторить';
+                        loadMoreBtn.disabled = false;
+                    }, 2000);
+                }
+            })
+            .finally(() => {
+                isLoading = false;
+            });
+    }
+    
+    function appendSearchResults(videos) {
+        videos.forEach(video => {
+            const resultItem = document.createElement('div');
+            resultItem.className = 'search-result-item';
+            resultItem.setAttribute('data-type', 'videos');
+            resultItem.onclick = function() {
+                window.location.href = `/video/${video.user_id}__${video.video_id}/`;
+            };
+            
+            const thumbnailUrl = video.thumbnail_url || '/static/placeholder.jpg';
+            
+            // Improved avatar content generation with proper handling
+            let avatarContent = '';
+            if (video.avatar_url) {
+                // Use actual avatar image if available
+                avatarContent = `<img src="${video.avatar_url}" alt="${video.display_name || video.channel}" loading="lazy">`;
+            } else {
+                // Otherwise use initial
+                const displayName = video.display_name || video.channel || '';
+                avatarContent = `<span class="avatar-text">${displayName.charAt(0)}</span>`;
+                
+                // Also attempt to load avatar asynchronously
+                setTimeout(() => {
+                    fetch(`/api/get-user-profile/?user_id=${encodeURIComponent(video.user_id)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success && data.profile && data.profile.avatar_url) {
+                                const avatarElem = resultItem.querySelector('.avatar-medium');
+                                if (avatarElem) {
+                                    avatarElem.innerHTML = `<img src="${data.profile.avatar_url}" alt="${video.display_name || video.channel}" loading="lazy">`;
+                                }
+                            }
+                        })
+                        .catch(err => console.error('Error loading avatar:', err));
+                }, 100);
+            }
+            
+            resultItem.innerHTML = `
+                <div class="result-thumbnail">
+                    <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy" onerror="this.src='/static/placeholder.jpg'">
+                    <div class="result-duration">${video.duration || '00:00'}</div>
+                </div>
+                <div class="result-details">
+                    <h3 class="result-title">${video.title}</h3>
+                    <div class="result-meta">${video.views_formatted || '0 просмотров'} • ${video.upload_date_formatted || 'Недавно'}</div>
+                    <div class="result-channel">
+                        <div class="avatar avatar-medium">${avatarContent}</div>
+                        <div class="channel-name">${video.display_name || video.channel}</div>
+                    </div>
+                    <div class="result-description">
+                        ${video.description ? (video.description.length > 150 ? video.description.substring(0, 147) + '...' : video.description) : ''}
+                    </div>
+                </div>
+            `;
+            
+            searchResultsContainer.appendChild(resultItem);
+        });
+        
+        // Initialize lazy loading for thumbnails
+        initializeLazyLoading();
+    }
+    
+    const filterItems = document.querySelectorAll('.filter-item');
+    filterItems.forEach(item => {
+        item.addEventListener('click', function() {
+            filterItems.forEach(filter => filter.classList.remove('active'));
+            this.classList.add('active');
+            
+            const filterType = this.getAttribute('data-filter');
+            const resultItems = document.querySelectorAll('.search-result-item');
+            resultItems.forEach(result => {
+                if (filterType === 'all' || result.getAttribute('data-type') === filterType) {
+                    result.style.display = 'flex';
+                } else {
+                    result.style.display = 'none';
+                }
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
