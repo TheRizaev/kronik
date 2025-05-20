@@ -223,126 +223,146 @@ def video_detail(request, video_id):
         
 def get_recommended_videos(current_user_id, current_video_id, limit=10):
     """
-    Получает рекомендованные видео на основе текущего видео.
-    Оптимизированная версия: получаем все видео из GCS, исключаем текущее и перемешиваем.
+    Gets recommended videos based on the current video.
+    Optimized version: get all videos from S3, exclude current one and shuffle.
     
     Args:
-        current_user_id: ID пользователя текущего видео
-        current_video_id: ID текущего видео
-        limit: максимальное количество рекомендаций
+        current_user_id: ID of the current video's user
+        current_video_id: ID of the current video
+        limit: maximum number of recommendations
         
     Returns:
-        list: Список рекомендованных видео
+        list: List of recommended videos
     """
     try:
         import random
         import concurrent.futures
         
-        # Получаем бакет
+        # Get bucket
         bucket = get_bucket(BUCKET_NAME)
         if not bucket:
             return []
             
-        # Получаем список пользователей
-        blobs = bucket.list_blobs(delimiter='/')
-        prefixes = list(blobs.prefixes)
-        users = [prefix.replace('/', '') for prefix in prefixes]
+        # Get list of users
+        client = bucket['client']
+        bucket_name = bucket['name']
         
-        # Кэш для профилей пользователей
+        # List objects with delimiter to get "directories"
+        users = set()
+        result = client.list_objects_v2(Bucket=bucket_name, Delimiter='/')
+        
+        # Get all prefixes (folders)
+        for prefix in result.get('CommonPrefixes', []):
+            user_id = prefix.get('Prefix', '').rstrip('/')
+            if user_id and user_id.startswith('@'):
+                users.add(user_id)
+        
+        # Cache for user profiles
         user_profiles = {}
         
-        # Используем ThreadPoolExecutor для параллельной загрузки видео
+        # Collection for all videos
         all_videos = []
         
-        # Функция для загрузки видео одного пользователя
+        # Function to load videos for a specific user
         def load_user_videos(user_id):
             videos_list = []
-            user_videos = list_user_videos(user_id)
             
-            if not user_videos:
+            try:
+                # Look for metadata folder
+                metadata_prefix = f"{user_id}/metadata/"
+                
+                # List objects with the metadata prefix
+                paginator = client.get_paginator('list_objects_v2')
+                metadata_objects = []
+                
+                pages = paginator.paginate(Bucket=bucket_name, Prefix=metadata_prefix)
+                for page in pages:
+                    if 'Contents' in page:
+                        metadata_objects.extend(page['Contents'])
+                
+                # Try to get user profile once
+                if user_id not in user_profiles:
+                    try:
+                        user_meta_key = f"{user_id}/bio/user_meta.json"
+                        response = client.get_object(Bucket=bucket_name, Key=user_meta_key)
+                        user_profiles[user_id] = json.loads(response['Body'].read().decode('utf-8'))
+                    except Exception:
+                        user_profiles[user_id] = None
+                
+                # Process each metadata file
+                for obj in metadata_objects:
+                    if obj['Key'].endswith('.json'):
+                        # Skip the current video
+                        if current_user_id == user_id and current_video_id in obj['Key']:
+                            continue
+                            
+                        try:
+                            # Get video metadata
+                            response = client.get_object(Bucket=bucket_name, Key=obj['Key'])
+                            metadata = json.loads(response['Body'].read().decode('utf-8'))
+                            
+                            # Skip the current video (double check)
+                            if current_user_id == user_id and metadata.get('video_id') == current_video_id:
+                                continue
+                                
+                            # Add user information to metadata
+                            metadata['user_id'] = user_id
+                            
+                            # Add channel/display name
+                            if user_id in user_profiles and user_profiles[user_id]:
+                                metadata['display_name'] = user_profiles[user_id].get('display_name', user_id.replace('@', ''))
+                            else:
+                                metadata['display_name'] = user_id.replace('@', '')
+                                
+                            # Format views
+                            views = metadata.get('views', 0)
+                            if isinstance(views, (int, str)) and str(views).isdigit():
+                                views = int(views)
+                                metadata['views_formatted'] = f"{views // 1000}K просмотров" if views >= 1000 else f"{views} просмотров"
+                            else:
+                                metadata['views_formatted'] = "0 просмотров"
+                                
+                            # Generate URL for video details page
+                            metadata['url'] = f"/video/{user_id}__{metadata.get('video_id')}/"
+                            
+                            # Add to collection
+                            videos_list.append(metadata)
+                        except Exception as e:
+                            logger.error(f"Error processing metadata file {obj['Key']}: {e}")
+                
                 return videos_list
-                
-            # Получаем профиль пользователя для display_name
-            if user_id not in user_profiles:
-                user_profile = get_user_profile_from_gcs(user_id)
-                user_profiles[user_id] = user_profile
-            else:
-                user_profile = user_profiles[user_id]
-            
-            for video in user_videos:
-                # Пропускаем текущее видео
-                if user_id == current_user_id and video.get('video_id') == current_video_id:
-                    continue
-                    
-                # Добавляем user_id к видео
-                if 'user_id' not in video:
-                    video['user_id'] = user_id
-                
-                # Добавляем display_name
-                if user_id in user_profiles and user_profiles[user_id] and 'display_name' in user_profiles[user_id]:
-                    video['display_name'] = user_profiles[user_id]['display_name']
-                else:
-                    # Если display_name отсутствует, используем username без префикса @
-                    video['display_name'] = user_id.replace('@', '')
-                    
-                videos_list.append(video)
-            
-            return videos_list
-            
-        # Загружаем видео параллельно с таймаутом
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_user = {executor.submit(load_user_videos, user_id): user_id for user_id in users}
-            for future in concurrent.futures.as_completed(future_to_user, timeout=5):
-                try:
-                    user_videos = future.result()
-                    all_videos.extend(user_videos)
-                except Exception as e:
-                    user_id = future_to_user[future]
-                    logger.error(f"Error loading videos for user {user_id}: {e}")
+            except Exception as e:
+                logger.error(f"Error loading videos for user {user_id}: {e}")
+                return []
         
-        # Перемешиваем видео
+        # Process all users and collect videos
+        for user_id in users:
+            user_videos = load_user_videos(user_id)
+            all_videos.extend(user_videos)
+        
+        # Shuffle all videos
         random.shuffle(all_videos)
         
-        # Ограничиваем количество
+        # Get the first 'limit' videos
         recommended = all_videos[:limit]
         
-        # Добавляем URL для каждого видео
+        # Add thumbnail URLs for recommended videos
         for video in recommended:
-            video_id = video.get('video_id')
-            user_id = video.get('user_id')
-            if video_id and user_id:
-                # URL для видео
-                video['url'] = f"/video/{user_id}__{video_id}/"
-                
-                # URL для миниатюры
-                if 'thumbnail_path' in video:
-                    video['thumbnail_url'] = generate_video_url(
-                        user_id, 
-                        video_id, 
-                        file_path=video['thumbnail_path'], 
-                        expiration_time=3600
-                    )
-                
-                # Форматируем данные для шаблона
-                # Используем display_name из метаданных или user_id
-                if 'channel' not in video:
-                    video['channel'] = video.get('display_name', video.get('user_id', ''))
-                
-                # Форматируем просмотры
-                views = video.get('views', 0)
-                if isinstance(views, int) or (isinstance(views, str) and views.isdigit()):
-                    views = int(views)
-                    if views >= 1000:
-                        video['views_formatted'] = f"{views // 1000}K просмотров"
-                    else:
-                        video['views_formatted'] = f"{views} просмотров"
-                else:
-                    video['views_formatted'] = "0 просмотров"
-                    
+            # Add thumbnail URL if needed
+            if 'thumbnail_path' in video and video.get('user_id') and video.get('video_id'):
+                video['thumbnail_url'] = generate_video_url(
+                    video['user_id'], 
+                    video['video_id'], 
+                    file_path=video['thumbnail_path'], 
+                    expiration_time=3600
+                )
+        
         return recommended
         
     except Exception as e:
+        import traceback
         logger.error(f"Error getting recommended videos: {e}")
+        logger.error(traceback.format_exc())
         return []
 
 def search_results(request):
@@ -1222,6 +1242,7 @@ def search_page(request):
     """
     return render(request, 'main/search_page.html')
 
+@login_required
 def toggle_video_like(request):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
@@ -1233,37 +1254,41 @@ def toggle_video_like(request):
         if not video_id or not user_id:
             return JsonResponse({'success': False, 'error': 'Missing video_id or user_id'}, status=400)
 
-        # Разделяем составной ID, если он передан
+        # Split composite ID if needed
         if '__' in video_id:
             user_id, video_id = video_id.split('__', 1)
 
-        # Получаем метаданные видео
+        # Get video metadata from S3
         metadata = get_video_metadata(user_id, video_id)
         if not metadata:
             return JsonResponse({'success': False, 'error': 'Video not found'}, status=404)
 
-        # Используем транзакцию для атомарного обновления
+        # Use atomic transaction for updating
         with transaction.atomic():
             try:
+                # Check if user already liked/disliked this video
                 existing_like = VideoLike.objects.get(
                     user=request.user,
                     video_id=video_id,
                     video_owner=user_id
                 )
+                
                 if existing_like.is_like:
-                    # Удаляем лайк
+                    # User is unliking a previously liked video
                     metadata['likes'] = max(0, int(metadata.get('likes', 0)) - 1)
                     existing_like.delete()
                     is_liked = False
+                    is_disliked = False
                 else:
-                    # Меняем дизлайк на лайк
+                    # User is changing dislike to like
                     metadata['likes'] = int(metadata.get('likes', 0)) + 1
                     metadata['dislikes'] = max(0, int(metadata.get('dislikes', 0)) - 1)
                     existing_like.is_like = True
                     existing_like.save()
                     is_liked = True
+                    is_disliked = False
             except VideoLike.DoesNotExist:
-                # Новый лайк
+                # New like
                 metadata['likes'] = int(metadata.get('likes', 0)) + 1
                 VideoLike.objects.create(
                     user=request.user,
@@ -1272,29 +1297,43 @@ def toggle_video_like(request):
                     is_like=True
                 )
                 is_liked = True
+                is_disliked = False
 
-            # Обновляем метаданные в GCS
+            # Update metadata in S3
             bucket = get_bucket()
             if not bucket:
                 return JsonResponse({'success': False, 'error': 'Failed to access storage'}, status=500)
 
+            client = bucket['client']
+            bucket_name = bucket['name']
             metadata_path = f"{user_id}/metadata/{video_id}.json"
-            metadata_blob = bucket.blob(metadata_path)
-            if not metadata_blob.exists():
+            
+            # S3-compatible way to check if metadata file exists
+            try:
+                client.head_object(Bucket=bucket_name, Key=metadata_path)
+            except Exception:
                 return JsonResponse({'success': False, 'error': 'Metadata not found'}, status=404)
-
-            metadata_blob.upload_from_string(json.dumps(metadata, indent=2), content_type='application/json')
+            
+            # S3-compatible way to update metadata
+            client.put_object(
+                Bucket=bucket_name,
+                Key=metadata_path,
+                Body=json.dumps(metadata, indent=2),
+                ContentType='application/json'
+            )
 
         return JsonResponse({
             'success': True,
             'likes': metadata['likes'],
             'dislikes': metadata.get('dislikes', 0),
             'is_liked': is_liked,
-            'is_disliked': False
+            'is_disliked': is_disliked
         })
 
     except Exception as e:
         logger.error(f"Error toggling like: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
@@ -1309,37 +1348,41 @@ def toggle_video_dislike(request):
         if not video_id or not user_id:
             return JsonResponse({'success': False, 'error': 'Missing video_id or user_id'}, status=400)
 
-        # Разделяем составной ID
+        # Split composite ID if needed
         if '__' in video_id:
             user_id, video_id = video_id.split('__', 1)
 
-        # Получаем метаданные видео
+        # Get video metadata from S3
         metadata = get_video_metadata(user_id, video_id)
         if not metadata:
             return JsonResponse({'success': False, 'error': 'Video not found'}, status=404)
 
-        # Используем транзакцию для атомарного обновления
+        # Use atomic transaction for updating
         with transaction.atomic():
             try:
+                # Check if user already liked/disliked this video
                 existing_like = VideoLike.objects.get(
                     user=request.user,
                     video_id=video_id,
                     video_owner=user_id
                 )
+                
                 if not existing_like.is_like:
-                    # Удаляем дизлайк
+                    # User is removing a previous dislike
                     metadata['dislikes'] = max(0, int(metadata.get('dislikes', 0)) - 1)
                     existing_like.delete()
+                    is_liked = False
                     is_disliked = False
                 else:
-                    # Меняем лайк на дизлайк
+                    # User is changing like to dislike
                     metadata['dislikes'] = int(metadata.get('dislikes', 0)) + 1
                     metadata['likes'] = max(0, int(metadata.get('likes', 0)) - 1)
                     existing_like.is_like = False
                     existing_like.save()
+                    is_liked = False
                     is_disliked = True
             except VideoLike.DoesNotExist:
-                # Новый дизлайк
+                # New dislike
                 metadata['dislikes'] = int(metadata.get('dislikes', 0)) + 1
                 VideoLike.objects.create(
                     user=request.user,
@@ -1347,30 +1390,44 @@ def toggle_video_dislike(request):
                     video_owner=user_id,
                     is_like=False
                 )
+                is_liked = False
                 is_disliked = True
 
-            # Обновляем метаданные в GCS
+            # Update metadata in S3
             bucket = get_bucket()
             if not bucket:
                 return JsonResponse({'success': False, 'error': 'Failed to access storage'}, status=500)
 
+            client = bucket['client']
+            bucket_name = bucket['name']
             metadata_path = f"{user_id}/metadata/{video_id}.json"
-            metadata_blob = bucket.blob(metadata_path)
-            if not metadata_blob.exists():
+            
+            # S3-compatible way to check if metadata file exists
+            try:
+                client.head_object(Bucket=bucket_name, Key=metadata_path)
+            except Exception:
                 return JsonResponse({'success': False, 'error': 'Metadata not found'}, status=404)
-
-            metadata_blob.upload_from_string(json.dumps(metadata, indent=2), content_type='application/json')
+            
+            # S3-compatible way to update metadata
+            client.put_object(
+                Bucket=bucket_name,
+                Key=metadata_path,
+                Body=json.dumps(metadata, indent=2),
+                ContentType='application/json'
+            )
 
         return JsonResponse({
             'success': True,
             'likes': metadata.get('likes', 0),
             'dislikes': metadata['dislikes'],
-            'is_liked': False,
+            'is_liked': is_liked,
             'is_disliked': is_disliked
         })
 
     except Exception as e:
         logger.error(f"Error toggling dislike: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 def get_video_like_status(request, video_id):
@@ -1419,12 +1476,12 @@ def channel_view(request, username):
         username: The channel's username (with or without @ prefix)
     """
     try:
-        # Ensure username has @ prefix for GCS storage
+        # Ensure username has @ prefix for S3 storage
         if not username.startswith('@'):
             username = '@' + username
         
-        # Get channel profile
-        channel = get_user_profile_from_gcs(username)
+        # Get channel profile with repair capability
+        channel = get_user_profile_from_gcs(username, attempt_repair=True)
         
         if not channel:
             messages.error(request, f'Канал {username} не найден')
@@ -1445,59 +1502,80 @@ def channel_view(request, username):
         videos = []
         total_videos = 0
         
-        # Get the GCS bucket
+        # Get the S3 bucket
         bucket = get_bucket(BUCKET_NAME)
         
         if bucket:
-            # Get metadatafiles for the user
+            client = bucket['client']
+            bucket_name = bucket['name']
+            
+            # Get metadata files for the user
             metadata_prefix = f"{username}/metadata/"
-            metadata_blobs = list(bucket.list_blobs(prefix=metadata_prefix))
+            
+            # List objects with the metadata prefix using pagination
+            paginator = client.get_paginator('list_objects_v2')
+            metadata_objects = []
+            
+            # Get all metadata objects for this user
+            try:
+                pages = paginator.paginate(Bucket=bucket_name, Prefix=metadata_prefix)
+                for page in pages:
+                    if 'Contents' in page:
+                        metadata_objects.extend(page['Contents'])
+            except Exception as e:
+                logger.error(f"Error listing metadata objects: {e}")
+                metadata_objects = []
             
             # Process metadata files
-            for blob in metadata_blobs:
-                if blob.name.endswith('.json'):
+            for obj in metadata_objects:
+                if obj['Key'].endswith('.json'):
                     try:
                         import json
                         from datetime import datetime
                         
-                        # Get video metadata
-                        metadata = json.loads(blob.download_as_text())
+                        # Get video metadata with auto-repair
+                        video_id = os.path.basename(obj['Key']).replace('.json', '')
+                        metadata = get_video_metadata(username, video_id, attempt_repair=True)
                         
-                        # Add user information
-                        metadata['user_id'] = username
-                        metadata['display_name'] = channel.get('display_name', username.replace('@', ''))
-                        
-                        # Format views
-                        views = metadata.get('views', 0)
-                        if isinstance(views, (int, str)) and str(views).isdigit():
-                            views = int(views)
-                            metadata['views_formatted'] = f"{views // 1000}K просмотров" if views >= 1000 else f"{views} просмотров"
-                        else:
-                            metadata['views_formatted'] = "0 просмотров"
-                        
-                        # Format upload date
-                        upload_date = metadata.get('upload_date', '')
-                        if upload_date:
-                            try:
-                                upload_datetime = datetime.fromisoformat(upload_date)
-                                metadata['upload_date_formatted'] = upload_datetime.strftime("%d.%m.%Y")
-                            except Exception:
-                                metadata['upload_date_formatted'] = upload_date[:10] if upload_date else "Недавно"
-                        else:
-                            metadata['upload_date_formatted'] = "Недавно"
-                        
-                        # Add thumbnail URL
-                        if 'thumbnail_path' in metadata:
-                            metadata['thumbnail_url'] = generate_video_url(
-                                username, 
-                                metadata['video_id'], 
-                                file_path=metadata['thumbnail_path'], 
-                                expiration_time=3600
-                            )
-                        
-                        videos.append(metadata)
+                        if metadata:
+                            # Add user information
+                            metadata['user_id'] = username
+                            metadata['display_name'] = channel.get('display_name', username.replace('@', ''))
+                            
+                            # Format views
+                            views = metadata.get('views', 0)
+                            if isinstance(views, (int, str)) and str(views).isdigit():
+                                views = int(views)
+                                metadata['views_formatted'] = f"{views // 1000}K просмотров" if views >= 1000 else f"{views} просмотров"
+                            else:
+                                metadata['views_formatted'] = "0 просмотров"
+                            
+                            # Format upload date
+                            upload_date = metadata.get('upload_date', '')
+                            if upload_date:
+                                try:
+                                    upload_datetime = datetime.fromisoformat(upload_date)
+                                    metadata['upload_date_formatted'] = upload_datetime.strftime("%d.%m.%Y")
+                                except Exception:
+                                    metadata['upload_date_formatted'] = upload_date[:10] if upload_date else "Недавно"
+                            else:
+                                metadata['upload_date_formatted'] = "Недавно"
+                            
+                            # Add thumbnail URL
+                            if 'thumbnail_path' in metadata:
+                                try:
+                                    metadata['thumbnail_url'] = generate_video_url(
+                                        username, 
+                                        metadata['video_id'], 
+                                        file_path=metadata['thumbnail_path'], 
+                                        expiration_time=3600
+                                    )
+                                except Exception as thumb_error:
+                                    logger.error(f"Error generating thumbnail URL: {thumb_error}")
+                            
+                            videos.append(metadata)
                     except Exception as e:
-                        logger.error(f"Error processing metadata for {blob.name}: {e}")
+                        logger.error(f"Error processing metadata for {obj['Key']}: {e}")
             
             # Sort videos by upload date (newest first)
             videos.sort(key=lambda x: x.get('upload_date', ''), reverse=True)
@@ -1510,11 +1588,13 @@ def channel_view(request, username):
         if 'stats' not in channel:
             channel['stats'] = {
                 'videos_count': total_videos,
-                'subscribers': 0  # Placeholder since we don't have real subscriber data
+                'subscribers': Subscription.objects.filter(channel_id=username).count()  # Get real subscriber count
             }
         else:
             # Update videos count
             channel['stats']['videos_count'] = total_videos
+            # Add subscribers count
+            channel['stats']['subscribers'] = Subscription.objects.filter(channel_id=username).count()
         
         return render(request, 'main/channel.html', {
             'channel': channel,
